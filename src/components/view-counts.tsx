@@ -34,8 +34,14 @@ export function ViewCounts() {
   if (!counts) return null;
 
   return (
-    <span className="text-[11px] tabular-nums text-muted-foreground/70">
-      {fmt(counts.last_24h)} views today · {fmt(counts.lifetime)} all time
+    <span className="whitespace-nowrap text-[11px] tabular-nums text-muted-foreground/70">
+      {/* A third nav item pushes the long form onto two lines at 393 px. */}
+      <span className="sm:hidden">
+        {fmt(counts.last_24h)} · {fmt(counts.lifetime)} all
+      </span>
+      <span className="hidden sm:inline">
+        {fmt(counts.last_24h)} views today · {fmt(counts.lifetime)} all time
+      </span>
     </span>
   );
 }

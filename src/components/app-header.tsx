@@ -15,13 +15,16 @@ import { cn } from "@/lib/utils";
 const NAV = [
   { href: "/", label: "Vitals" },
   { href: "/nutrition", label: "Nutrition" },
+  // Only while the pencil is on: it is about the people looking at the page,
+  // not about the health records, and it has no place in the everyday view.
+  { href: "/analytics", label: "Analytics", ownerOnly: true },
 ] as const;
 
 export function AppHeader() {
   const router = useRouter();
   const pathname = usePathname();
   const { signOut } = useSession();
-  const { personId, setPersonId, people, meId } = usePerson();
+  const { personId, setPersonId, people, meId, canEdit } = usePerson();
 
   return (
     <header className="sticky top-0 z-10 border-b border-border/60 bg-background/85 backdrop-blur">
@@ -33,7 +36,7 @@ export function AppHeader() {
           aria-label="Sections"
           className="order-last flex w-full items-center gap-1 sm:order-none sm:ml-4 sm:w-auto"
         >
-          {NAV.map((item) => (
+          {NAV.filter((item) => !("ownerOnly" in item) || canEdit(personId)).map((item) => (
             <Link
               key={item.href}
               href={item.href}
