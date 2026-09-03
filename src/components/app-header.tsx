@@ -1,6 +1,6 @@
 "use client";
 
-import { LogOut } from "lucide-react";
+import { LogOut, Plus } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -10,31 +10,51 @@ import { useSession } from "@/components/auth-provider";
 import { usePerson } from "@/components/person-provider";
 import { cn } from "@/lib/utils";
 
-const NAV = [
-  { href: "/", label: "Vitals" },
-  { href: "/nutrition", label: "Nutrition" },
-  // Only while the pencil is on: it is about the people looking at the page,
-  // not about the health records, and it has no place in the everyday view.
-  { href: "/analytics", label: "Analytics", ownerOnly: true },
-] as const;
+interface NavItem {
+  href: string;
+  label: string;
+  /** Only for people who have records here. */
+  owner?: boolean;
+  /** Only while the pencil is on. */
+  editing?: boolean;
+}
+
+const NAV: NavItem[] = [
+  { href: "/", label: "Vitals", owner: true },
+  { href: "/nutrition", label: "Nutrition", owner: true },
+  { href: "/preview", label: "Preview" },
+  { href: "/analytics", label: "Analytics", owner: true, editing: true },
+];
 
 export function AppHeader() {
   const router = useRouter();
   const pathname = usePathname();
   const { signOut } = useSession();
   const { personId, setPersonId, people, meId, canEdit } = usePerson();
+  const isOwner = meId !== null;
+
+  const nav = NAV.filter(
+    (item) =>
+      (!item.owner || isOwner) && (!item.editing || canEdit(personId))
+  );
 
   return (
     <header className="sticky top-0 z-10 border-b border-border/60 bg-background/85 backdrop-blur">
       {/* Below sm the section links drop to their own row — the wordmark,
-          person switch and three controls already fill 393 px. */}
+          person switch and controls already fill 393 px. */}
       <div className="mx-auto flex w-full max-w-5xl flex-wrap items-center gap-x-2 gap-y-1.5 px-5 py-2.5 sm:flex-nowrap sm:gap-3 sm:px-8 sm:py-3">
-        <span className="font-serif text-xl leading-none">Health</span>
+        <Link
+          href="/"
+          className="font-serif text-xl leading-none transition-opacity hover:opacity-80"
+        >
+          Health
+        </Link>
+
         <nav
           aria-label="Sections"
           className="order-last flex w-full items-center gap-1 sm:order-none sm:ml-4 sm:w-auto"
         >
-          {NAV.filter((item) => !("ownerOnly" in item) || canEdit(personId)).map((item) => (
+          {nav.map((item) => (
             <Link
               key={item.href}
               href={item.href}
@@ -49,6 +69,7 @@ export function AppHeader() {
             </Link>
           ))}
         </nav>
+
         {people.length > 1 ? (
           <Tabs
             value={personId ?? undefined}
@@ -66,7 +87,21 @@ export function AppHeader() {
         ) : (
           <span className="ml-auto" />
         )}
-        {meId ? <EditModeToggle /> : null}
+
+        {isOwner ? (
+          <Link
+            href="/partner"
+            title="Add your partner's data"
+            aria-label="Add your partner's data"
+            className="group grid size-8 shrink-0 place-items-center rounded-lg border text-muted-foreground transition-colors hover:border-ring/60 hover:text-foreground"
+          >
+            <Plus className="size-4" strokeWidth={1.75} aria-hidden />
+            <span className="sr-only">Add your partner&apos;s data</span>
+          </Link>
+        ) : null}
+
+        {isOwner ? <EditModeToggle /> : null}
+
         <Button
           variant="outline"
           size="icon"

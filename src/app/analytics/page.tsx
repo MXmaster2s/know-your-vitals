@@ -13,6 +13,15 @@ import {
   type Visitor,
 } from "@/lib/analytics";
 
+/** Someone who has paid. The one distinction worth drawing in this table. */
+function PaidPill() {
+  return (
+    <span className="rounded-full border border-positive/40 bg-positive/10 px-2 py-0.5 text-[10px] uppercase tracking-wider text-positive">
+      Paid user
+    </span>
+  );
+}
+
 export default function AnalyticsPage() {
   const { personId, canEdit } = usePerson();
   const allowed = canEdit(personId);
@@ -118,8 +127,11 @@ export default function AnalyticsPage() {
                       {stamp(v.last_seen)}
                     </td>
                     <td className={cn("px-3 py-3", !last && "border-b")}>
-                      <span className="block font-serif text-base leading-tight">
-                        {v.name ?? v.email.split("@")[0]}
+                      <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                        <span className="font-serif text-base leading-tight">
+                          {v.name ?? v.email.split("@")[0]}
+                        </span>
+                        {v.paid_at ? <PaidPill /> : null}
                       </span>
                       <span className="mt-0.5 block break-all text-xs text-muted-foreground">
                         {v.email}

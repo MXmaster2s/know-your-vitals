@@ -7,6 +7,8 @@ export interface Visitor {
   first_seen: string | null;
   last_seen: string | null;
   visits: number;
+  /** Set by the Dodo webhook when a payment clears. */
+  paid_at: string | null;
 }
 
 export interface VisitTime {

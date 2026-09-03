@@ -39,6 +39,7 @@ export function GuestDialog({
     ["First seen", shortDate(guest.first_seen)],
     ["Last seen", ago(guest.last_seen)],
     ["Signed in with", guest.provider ?? "—"],
+    ["Paid", guest.paid_at ? shortDate(guest.paid_at) : "no"],
   ];
 
   return (
@@ -58,7 +59,7 @@ export function GuestDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <dl className="grid grid-cols-2 gap-x-4 gap-y-3 border-y py-4 sm:grid-cols-4">
+        <dl className="grid grid-cols-2 gap-x-4 gap-y-3 border-y py-4 sm:grid-cols-5">
           {facts.map(([k, v]) => (
             <div key={k}>
               <dt className="text-[11px] text-muted-foreground">{k}</dt>
