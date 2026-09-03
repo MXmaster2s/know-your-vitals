@@ -3,6 +3,7 @@ import { Geist, Geist_Mono, Newsreader } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-toggle";
 import { AuthProvider } from "@/components/auth-provider";
+import { PostHogProvider } from "@/components/posthog-provider";
 import { AppShell } from "@/components/app-shell";
 import { SwRegister } from "@/components/sw-register";
 
@@ -23,21 +24,20 @@ const newsreader = Newsreader({
 });
 
 export const metadata: Metadata = {
-  title: "Vitals",
+  title: "Health",
   description: "Family health dashboard.",
   icons: { apple: "/apple-touch-icon.png" },
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "Vitals",
+    title: "Health",
   },
 };
 
+// Dark is the default, so the standalone PWA chrome should start dark too.
 export const viewport: Viewport = {
-  themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#faf9f7" },
-    { media: "(prefers-color-scheme: dark)", color: "#17191e" },
-  ],
+  themeColor: "#17191e",
+  viewportFit: "cover",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
@@ -50,7 +50,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       <body className="min-h-full flex flex-col bg-background text-foreground">
         <ThemeProvider>
           <AuthProvider>
-            <AppShell>{children}</AppShell>
+            <PostHogProvider>
+              <AppShell>{children}</AppShell>
+            </PostHogProvider>
           </AuthProvider>
         </ThemeProvider>
         <SwRegister />

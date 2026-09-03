@@ -5,6 +5,7 @@ import { AddMeasurementDialog } from "@/components/add-measurement-dialog";
 import { DashboardControls } from "@/components/dashboard-controls";
 import { MarkerDetailDialog } from "@/components/marker-detail-dialog";
 import { MarkerTile } from "@/components/marker-tile";
+import { ReportsList } from "@/components/reports-list";
 import {
   AttentionSection,
   PositiveSection,
@@ -25,7 +26,7 @@ import {
 } from "@/lib/derive";
 
 export default function DashboardPage() {
-  const { personId, labelFor } = usePerson();
+  const { personId, labelFor, canEdit } = usePerson();
   const { data, error, refresh } = usePersonData();
   const [openMarker, setOpenMarker] = React.useState<Marker | null>(null);
   const [showHidden, setShowHidden] = React.useState(false);
@@ -97,12 +98,14 @@ export default function DashboardPage() {
         <h1 className="font-serif text-2xl">
           {personLabel}
         </h1>
-        <AddMeasurementDialog
-          markers={data.markers}
-          personId={personId}
-          personLabel={personLabel}
-          onAdded={refresh}
-        />
+        {canEdit(personId) ? (
+          <AddMeasurementDialog
+            markers={data.markers}
+            personId={personId}
+            personLabel={personLabel}
+            onAdded={refresh}
+          />
+        ) : null}
       </div>
 
       <DashboardControls
@@ -172,6 +175,17 @@ export default function DashboardPage() {
           ))}
         </>
       )}
+
+      {/* The archive sits behind the pencil: reading the dashboard is the
+          everyday job, and the full report list is what you open when you are
+          working on the data. Hidden while filtering too, so a search returns
+          a search rather than a search plus every reading you have ever had. */}
+      {canEdit(personId) && !filtering ? (
+        <section aria-label="Reports">
+          <h2 className="mb-3 font-serif text-lg">Reports</h2>
+          <ReportsList data={data} personLabel={personLabel} />
+        </section>
+      ) : null}
 
       <MarkerDetailDialog
         marker={openMarker}

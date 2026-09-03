@@ -3,6 +3,7 @@
 import { usePathname } from "next/navigation";
 import { AuthGuard } from "@/components/auth-guard";
 import { AppHeader } from "@/components/app-header";
+import { EditModeProvider } from "@/components/edit-mode";
 import { PersonProvider } from "@/components/person-provider";
 
 /**
@@ -14,6 +15,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   if (pathname === "/login") return <>{children}</>;
   return (
     <AuthGuard>
+      <EditModeProvider>
       <PersonProvider>
         <div className="flex min-h-dvh w-full flex-col">
           <AppHeader />
@@ -22,6 +24,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </main>
         </div>
       </PersonProvider>
+      </EditModeProvider>
     </AuthGuard>
   );
 }

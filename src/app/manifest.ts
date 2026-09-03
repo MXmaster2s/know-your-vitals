@@ -7,8 +7,8 @@ export const dynamic = "force-static";
 // Colors match the globals.css palette: light --background / dark --background.
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Vitals",
-    short_name: "Vitals",
+    name: "Health",
+    short_name: "Health",
     description: "Family health dashboard",
     start_url: "/",
     display: "standalone",

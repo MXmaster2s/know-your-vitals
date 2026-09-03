@@ -13,19 +13,83 @@ It works offline as an installable PWA.
 
 ## What it does
 
-- **Doing well / Needs attention** — the good news first, then anything outside
-  its printed range, each with the change since your last test.
+- **Doing well / Outside range** — the good news first, then anything outside
+  its printed range, each with the change since your last test. It reports what
+  the numbers did; what to do about them is a conversation with a doctor.
+- **Every visit in full**, at the foot of the same page — the cards are what you
+  check, the report list is what you scroll to when a card raises a question.
 - **Trends** — every marker charted over time with the lab's reference range
   drawn as a band, so you can see whether a value is drifting.
 - **Two-person comparison** — useful for couples or a parent and child.
 - **Per-report filter** — see one visit in isolation, with the history up to
   that date preserved.
+- **Editing is a mode** — off by default, turned on with the pencil in the
+  header, so a stray tap on a phone scrolls the page instead of opening a field.
+  It also decides how much is on screen: reading gives you the cards, and the
+  pencil brings out the things you only need while working on the data —
+  dismissing a card, restoring one, and the full report archive.
 - **Search** — by marker name, id, or category.
 - **Copy for AI** — every card copies a clean text block (what the marker is,
   every reading with its date, lab and range, plus a trend summary) ready to
   paste into a chat or an email to your GP.
 - **Dismissals** — hide a flagged reading you have already dealt with. Keyed to
   that specific reading, so a *new* flagged result surfaces again on its own.
+
+## Nutrition (optional)
+
+Run `supabase/nutrition.sql` to add a **Nutrition** tab: an ingredient library
+priced the way you actually shop, meal plans built from it, and macro / activity
+targets to measure the plan against.
+
+The design decision that makes it useful: nutrition is stored per 100 g of
+**edible** weight, price is per kg **as purchased**, and `edible_yield` bridges
+the two. Bone-in chicken at 0.65 means a kilo off the scale leaves 650 g you can
+eat — so cost-per-gram-of-protein counts the bone you paid for but not the
+protein you didn't get. `meal_items.share` covers dishes split between people:
+enter the 400 g you cooked once, and each person's day picks up their fraction.
+
+**The day** reads as a timetable: time, event, what was eaten, and the derived
+calories, protein and cost. The first three edit in place; the totals do not,
+because they are summed from the ingredients.
+
+Tapping a row opens **Edit food**, where a meal is broken into the *Foods* it is
+made of — "Salad", "Smoothie", "Dal" — each a box with its own name, totals and
+ingredients, because Salad is one thing you eat and five things you bought.
+Inside a box: item, amount, unit, comments, nutrition, link, price. Amounts are
+in grams, millilitres or pieces — grams stay canonical, and because "half a
+cucumber" means nothing without knowing what a cucumber weighs, the unit picker
+asks for that conversion in the same breath.
+
+Price is entered per item per meal, not as a per-kg rate. What a thing cost in
+a meal is something you know; what it costs per kilo is a rate you would have
+to work out, and per-meal is what adds up to a weekly or monthly food bill
+anyway.
+
+Ingredients are added by typing a name, not picking from a list — write down
+what you ate now, look the numbers up later. A food with no figures says so
+rather than counting as zero.
+
+Every number is editable inline — reference tables are approximations and your
+butcher's price is not.
+
+## Who may edit what
+
+With more than one person in the vault, read is shared and writes are not: by
+default a sign-in may change only its own rows. `people.email` maps a sign-in
+to a person, `public.me()` resolves it, and `public.can_write()` decides —
+your own rows always, everyone's when `people.can_edit_all` is set, which is
+how one person keeps the records for a household. Every person-scoped table
+carries a `read_allowed` select policy plus a `write_own` policy. `foods` stays
+shared — the ingredient library belongs to the household.
+
+Add both policies to any new person-scoped table, or it will be writable by
+everyone on the allowlist.
+
+## Planned reports
+
+A row in `reports` with `planned = true` is a visit you intend to take. It shows
+greyed out in the report filter and in a "Scheduled" list, so the next test stays
+visible. Entering any measurement on that date flips it to a real report.
 
 ## Why reference ranges are stored per measurement
 
@@ -92,10 +156,32 @@ The anon key ships in the browser bundle. That is normal for Supabase and safe
 is:
 
 - Anyone can hit your Supabase URL with the anon key → **RLS returns nothing.**
-- Anyone can sign up for an account → **their email is not allowlisted, so RLS
-  still returns nothing.**
+- Anyone can sign up for an account → **their email is not in `readers`, so RLS
+  still returns nothing.** (Self-hosted GoTrue ships with signup enabled, so do
+  not assume "authenticated" means "invited".)
 - The service-role key is never used by the app and must never be put in
   `.env.local`.
+
+### Readers, owners and viewers
+
+Three levels, and the difference between the last two is whether you have a row
+in `people`:
+
+| | in `readers` | in `people` | can read | can write |
+|---|---|---|---|---|
+| Owner | yes | yes | everything | their own rows, or everyone's with `can_edit_all` |
+| Viewer | yes | no | everything | nothing |
+| Anyone else | no | — | nothing | nothing |
+
+A viewer is how you give someone read access — a partner, a parent, a doctor —
+without giving them a way to change anything. Add their address to `readers`,
+create them a Supabase user, done. No policy changes.
+
+There is deliberately **no anonymous read**. Because the anon key is in the
+bundle, granting `select` to `anon` would not mean "people can see the page" —
+it would mean anyone who loads the page can lift the key and query the whole
+database directly. If you want a public link, publish a demo dataset rather
+than opening the real one.
 
 Verify it yourself after setup — this should be `permission denied`:
 

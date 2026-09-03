@@ -5,27 +5,34 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { EditModeToggle } from "@/components/edit-mode";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { ViewCounts } from "@/components/view-counts";
 import { useSession } from "@/components/auth-provider";
 import { usePerson } from "@/components/person-provider";
 import { cn } from "@/lib/utils";
 
 const NAV = [
-  { href: "/", label: "Overview" },
-  { href: "/reports", label: "Reports" },
+  { href: "/", label: "Vitals" },
+  { href: "/nutrition", label: "Nutrition" },
 ] as const;
 
 export function AppHeader() {
   const router = useRouter();
   const pathname = usePathname();
   const { signOut } = useSession();
-  const { personId, setPersonId, people } = usePerson();
+  const { personId, setPersonId, people, meId } = usePerson();
 
   return (
     <header className="sticky top-0 z-10 border-b border-border/60 bg-background/85 backdrop-blur">
-      <div className="mx-auto flex w-full max-w-5xl items-center gap-2 px-5 py-3 sm:gap-3 sm:px-8">
-        <span className="font-serif text-xl leading-none">Vitals</span>
-        <nav aria-label="Sections" className="ml-2 flex items-center gap-1 sm:ml-4">
+      {/* Below sm the section links drop to their own row — the wordmark,
+          person switch and three controls already fill 393 px. */}
+      <div className="mx-auto flex w-full max-w-5xl flex-wrap items-center gap-x-2 gap-y-1.5 px-5 py-2.5 sm:flex-nowrap sm:gap-3 sm:px-8 sm:py-3">
+        <span className="font-serif text-xl leading-none">Health</span>
+        <nav
+          aria-label="Sections"
+          className="order-last flex w-full items-center gap-1 sm:order-none sm:ml-4 sm:w-auto"
+        >
           {NAV.map((item) => (
             <Link
               key={item.href}
@@ -40,6 +47,11 @@ export function AppHeader() {
               {item.label}
             </Link>
           ))}
+          {/* Sits at the tail of the section links: on a phone that row has
+              the space, and the counts are the least urgent thing here. */}
+          <span className="ml-auto pl-2 sm:ml-3">
+            <ViewCounts />
+          </span>
         </nav>
         {people.length > 1 ? (
           <Tabs
@@ -58,6 +70,7 @@ export function AppHeader() {
         ) : (
           <span className="ml-auto" />
         )}
+        {meId ? <EditModeToggle /> : null}
         <ThemeToggle />
         <Button
           variant="outline"

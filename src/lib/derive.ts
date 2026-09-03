@@ -192,7 +192,7 @@ export interface PositiveEntry {
 export function positiveEntries(series: MarkerSeries[]): PositiveEntry[] {
   const out: PositiveEntry[] = [];
   for (const s of series) {
-    if (s.latestFlag) continue; // flagged → belongs in Needs attention
+    if (s.latestFlag) continue; // flagged → belongs in Outside range
     if (s.latest.ref_low == null && s.latest.ref_high == null) continue;
 
     let kind: PositiveKind = "steady";

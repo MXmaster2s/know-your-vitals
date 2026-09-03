@@ -24,6 +24,10 @@ export function DashboardControls({
   const ordered = [...reports].sort((a, b) =>
     b.taken_on.localeCompare(a.taken_on)
   );
+  const taken = ordered.filter((r) => !r.planned);
+  // Scheduled visits sit at the end, oldest-first, so the next one to happen
+  // reads left to right after the history.
+  const planned = ordered.filter((r) => r.planned).reverse();
 
   return (
     <div className="space-y-3">
@@ -54,17 +58,18 @@ export function DashboardControls({
       </div>
 
       <div
-        className="flex flex-wrap gap-2"
+        className="flex flex-wrap items-center gap-2"
         role="group"
         aria-label="Filter by report"
       >
+        <span className="text-xs text-muted-foreground">Reports:</span>
         <Chip
           active={selectedReport === null}
           onClick={() => onSelectReport(null)}
         >
           All
         </Chip>
-        {ordered.map((r) => (
+        {taken.map((r) => (
           <Chip
             key={r.id}
             active={selectedReport === r.taken_on}
@@ -72,6 +77,21 @@ export function DashboardControls({
               onSelectReport(selectedReport === r.taken_on ? null : r.taken_on)
             }
             title={r.lab ?? undefined}
+          >
+            {fmtDate(r.taken_on)}
+          </Chip>
+        ))}
+        {/* Booked, not taken. Greyed and unclickable — there is nothing behind
+            it to filter to, but it keeps the next test in view. */}
+        {planned.map((r) => (
+          <Chip
+            key={r.id}
+            active={false}
+            disabled
+            onClick={() => {}}
+            title={`Scheduled — ${fmtDate(r.taken_on)}${
+              r.notes ? ` · ${r.notes}` : ""
+            }`}
           >
             {fmtDate(r.taken_on)}
           </Chip>
@@ -85,11 +105,13 @@ function Chip({
   active,
   onClick,
   title,
+  disabled,
   children,
 }: {
   active: boolean;
   onClick: () => void;
   title?: string;
+  disabled?: boolean;
   children: React.ReactNode;
 }) {
   return (
@@ -97,16 +119,22 @@ function Chip({
       type="button"
       onClick={onClick}
       title={title}
-      aria-pressed={active}
+      disabled={disabled}
+      aria-pressed={disabled ? undefined : active}
       className={cn(
         "rounded-full border px-3 py-1 text-xs transition-colors",
         "focus-visible:outline-2 focus-visible:outline-ring/60",
-        active
-          ? "border-foreground bg-foreground text-background"
-          : "border-border bg-card text-muted-foreground hover:border-ring/50 hover:text-foreground"
+        disabled
+          ? "cursor-default border-dashed border-border/70 bg-transparent text-muted-foreground/60"
+          : active
+            ? "border-foreground bg-foreground text-background"
+            : "border-border bg-card text-muted-foreground hover:border-ring/50 hover:text-foreground"
       )}
     >
       {children}
+      {disabled ? (
+        <span className="ml-1.5 opacity-70">scheduled</span>
+      ) : null}
     </button>
   );
 }

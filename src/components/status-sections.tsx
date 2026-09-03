@@ -3,6 +3,7 @@
 import * as React from "react";
 import { Check, MoveDownRight, MoveUpRight, StickyNote, X } from "lucide-react";
 import { CopyButton } from "@/components/copy-button";
+import { usePerson } from "@/components/person-provider";
 import { cn } from "@/lib/utils";
 import type { QualitativeFinding } from "@/lib/data";
 import type { AttentionEntry, PositiveEntry } from "@/lib/derive";
@@ -188,7 +189,7 @@ export function PositiveSection({
   );
 }
 
-/* Needs attention ----------------------------------------------------------*/
+/* Outside range ------------------------------------------------------------*/
 
 export function AttentionSection({
   entries,
@@ -213,8 +214,13 @@ export function AttentionSection({
 }) {
   const total = entries.length + findings.length;
 
+  const { personId, canEdit } = usePerson();
+  // Dismissing a card, and bringing one back, are both edits — they belong
+  // behind the pencil like everything else you can change.
+  const editable = canEdit(personId);
+
   const footer =
-    hiddenCount > 0 ? (
+    editable && hiddenCount > 0 ? (
       <button
         type="button"
         onClick={onToggleHidden}
@@ -228,7 +234,7 @@ export function AttentionSection({
 
   if (total === 0) {
     return (
-      <Section title="Needs attention" tone="attention" count={0} footer={footer}>
+      <Section title="Outside range" tone="attention" count={0} footer={footer}>
         <p className="rounded-xl border border-dashed bg-card/50 px-4 py-6 text-sm text-muted-foreground">
           Nothing flagged — every latest reading sits inside its printed range.
         </p>
@@ -238,7 +244,7 @@ export function AttentionSection({
 
   return (
     <Section
-      title="Needs attention"
+      title="Outside range"
       tone="attention"
       count={total}
       footer={footer}
@@ -254,7 +260,9 @@ export function AttentionSection({
               key={marker.id}
               tone="attention"
               onOpen={() => onOpenMarker(marker.id)}
-              onDismiss={() => onDismissMeasurement(latest.id)}
+              onDismiss={
+                editable ? () => onDismissMeasurement(latest.id) : undefined
+              }
               dismissLabel={`Dismiss ${marker.name ?? marker.id}`}
               copy={{
                 label: `Copy ${marker.name ?? marker.id} data`,
@@ -313,7 +321,9 @@ export function AttentionSection({
           <CardShell
             key={finding.id}
             tone="note"
-            onDismiss={() => onDismissFinding(finding.id)}
+            onDismiss={
+              editable ? () => onDismissFinding(finding.id) : undefined
+            }
             dismissLabel={`Dismiss ${finding.title ?? "finding"}`}
             copy={{
               label: `Copy ${finding.title ?? "finding"}`,

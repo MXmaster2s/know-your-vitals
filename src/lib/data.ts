@@ -9,6 +9,10 @@ export interface Person {
   id: string;
   display_name: string | null;
   dob: string | null; // ISO date
+  /** Which sign-in owns this person's rows. Read is shared; writes are not. */
+  email: string | null;
+  /** Keeps the whole household's records, not only their own. */
+  can_edit_all: boolean;
 }
 
 export interface Report {
@@ -19,6 +23,9 @@ export interface Report {
   kind: string | null;
   source_file: string | null;
   notes: string | null;
+  /** A visit you intend to take, not one you have. No measurements hang off
+   *  it — it exists so the next test stays visible. */
+  planned: boolean;
 }
 
 export type MarkerCategory =
@@ -142,13 +149,22 @@ export interface NewMeasurement {
 export async function addMeasurement(input: NewMeasurement): Promise<void> {
   const { data: existing, error: findError } = await supabase
     .from("reports")
-    .select("id")
+    .select("id, planned")
     .eq("person_id", input.person_id)
     .eq("taken_on", input.taken_on)
     .limit(1);
   if (findError) throw new Error(findError.message);
 
   let reportId: string | undefined = existing?.[0]?.id;
+
+  // A scheduled visit stops being scheduled the moment a result lands on it.
+  if (reportId && existing?.[0]?.planned) {
+    const { error: unplanError } = await supabase
+      .from("reports")
+      .update({ planned: false })
+      .eq("id", reportId);
+    if (unplanError) throw new Error(unplanError.message);
+  }
   if (!reportId) {
     const { data: created, error: createError } = await supabase
       .from("reports")
@@ -222,4 +238,26 @@ export async function undismiss(
     .eq("kind", kind)
     .eq("ref_id", refId);
   if (error) throw new Error(error.message);
+}
+
+// ---- Page views ----------------------------------------------------------
+
+export interface ViewCounts {
+  last_24h: number;
+  lifetime: number;
+}
+
+/** Records one page load. The `page_views` table has no RLS policies at all —
+ *  this security-definer function is the only way in, so a visitor can add to
+ *  the log but can neither read nor tamper with it. */
+export async function recordView(path: string): Promise<void> {
+  const { error } = await supabase.rpc("record_view", { p: path });
+  if (error) throw new Error(error.message);
+}
+
+export async function getViewCounts(): Promise<ViewCounts | null> {
+  const { data, error } = await supabase.rpc("view_counts");
+  if (error) throw new Error(error.message);
+  const row = Array.isArray(data) ? data[0] : data;
+  return row ? { last_24h: Number(row.last_24h), lifetime: Number(row.lifetime) } : null;
 }
