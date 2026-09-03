@@ -6,8 +6,6 @@ import { usePathname, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { EditModeToggle } from "@/components/edit-mode";
-import { ThemeToggle } from "@/components/theme-toggle";
-import { ViewCounts } from "@/components/view-counts";
 import { useSession } from "@/components/auth-provider";
 import { usePerson } from "@/components/person-provider";
 import { cn } from "@/lib/utils";
@@ -50,11 +48,6 @@ export function AppHeader() {
               {item.label}
             </Link>
           ))}
-          {/* Sits at the tail of the section links: on a phone that row has
-              the space, and the counts are the least urgent thing here. */}
-          <span className="ml-auto pl-2 sm:ml-3">
-            <ViewCounts />
-          </span>
         </nav>
         {people.length > 1 ? (
           <Tabs
@@ -74,7 +67,6 @@ export function AppHeader() {
           <span className="ml-auto" />
         )}
         {meId ? <EditModeToggle /> : null}
-        <ThemeToggle />
         <Button
           variant="outline"
           size="icon"

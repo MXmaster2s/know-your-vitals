@@ -163,8 +163,11 @@ $$;
 do $$
 declare t text;
 begin
+  -- `from public` alone is not enough: Supabase grants `anon` EXECUTE
+  -- explicitly, so it survives a PUBLIC revoke. The anon key ships in the
+  -- browser bundle, so anything anon may execute is open to the internet.
   foreach t in array array['can_read()','me()','is_owner()','can_write(text)'] loop
-    execute format('revoke all on function public.%s from public', t);
+    execute format('revoke all on function public.%s from anon, public', t);
     execute format('grant execute on function public.%s to authenticated', t);
   end loop;
 

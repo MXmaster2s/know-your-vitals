@@ -2,6 +2,7 @@
 
 import { usePathname } from "next/navigation";
 import { AuthGuard } from "@/components/auth-guard";
+import { AppFooter } from "@/components/app-footer";
 import { AppHeader } from "@/components/app-header";
 import { EditModeProvider } from "@/components/edit-mode";
 import { PersonProvider } from "@/components/person-provider";
@@ -22,6 +23,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <main className="mx-auto w-full max-w-5xl flex-1 px-5 pb-24 pt-8 sm:px-8">
             {children}
           </main>
+          <AppFooter />
         </div>
       </PersonProvider>
       </EditModeProvider>

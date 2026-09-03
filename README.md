@@ -84,10 +84,15 @@ seen, how they signed in, which pages they opened, and every visit with its
 timestamp. There is no profile and no avatar; they followed a link, and that is
 the whole relationship.
 
-It reads through `visitor_log()` and `visit_times()`, both `security definer`.
-Each checks `is_owner()` **inside the function body**, because definer bypasses
-RLS — without that check any signed-in visitor could list every other visitor's
-email address.
+Run `supabase/analytics.sql` to enable it. Reads go through `visitor_log()` and
+`visit_times()`, both `security definer`. Each checks `is_owner()` **inside the
+function body**, because definer bypasses RLS — without that check any
+signed-in visitor could list every other visitor's email address.
+
+One trap worth knowing: `revoke ... from public` does **not** cover the `anon`
+role, which Supabase grants EXECUTE explicitly. Since the anon key ships in the
+browser bundle, any function `anon` can execute is open to the internet. Revoke
+from `anon` by name.
 
 ## Who may edit what
 
