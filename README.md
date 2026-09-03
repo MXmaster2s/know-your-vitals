@@ -78,17 +78,16 @@ With more than one reader, an **Analytics** section appears in the nav — but
 only while editing is on, because it is about the people looking at the page
 rather than the records themselves.
 
-Every visitor gets a **visit ribbon on one shared time axis**: discrete ticks,
-because visits are discrete events and smoothing a dozen of them into a curve
-would draw traffic that never happened. Someone who visited once shows a nearly
-empty lane, which is the point — it places their single visit against everyone
-else's, and a burst of arrivals after a link is shared becomes a visible
-vertical band running down the page.
+A two-column table: when each guest last visited, and who they are. Clicking a
+row opens **Guest analytics** for that person — how many visits, first and last
+seen, how they signed in, which pages they opened, and every visit with its
+timestamp. There is no profile and no avatar; they followed a link, and that is
+the whole relationship.
 
-It reads through three `security definer` functions (`visitor_log`,
-`visit_times`, `page_totals`). Each one checks `is_owner()` **inside the
-function**, because definer bypasses RLS — without that check any signed-in
-visitor could list every other visitor's email address.
+It reads through `visitor_log()` and `visit_times()`, both `security definer`.
+Each checks `is_owner()` **inside the function body**, because definer bypasses
+RLS — without that check any signed-in visitor could list every other visitor's
+email address.
 
 ## Who may edit what
 

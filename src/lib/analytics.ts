@@ -11,6 +11,7 @@ export interface Visitor {
 
 export interface VisitTime {
   email: string;
+  path: string;
   viewed_at: string;
 }
 
@@ -55,4 +56,11 @@ export function shortDate(iso: string | null): string {
     day: "numeric",
     month: "short",
   });
+}
+
+/** "3 Sep, 15:40" — the whole point of the first column, so it carries both. */
+export function stamp(iso: string | null): string {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  return `${d.toLocaleDateString("en-GB", { day: "numeric", month: "short" })}, ${d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}`;
 }
