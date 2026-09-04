@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { ViewCounts } from "@/components/view-counts";
 
@@ -29,11 +30,18 @@ export function AppFooter() {
             >
               Request access
             </a>
-            {/* Said out loud, because the link opens a payment page and
-                nobody should meet a price they were not expecting. */}
-            <span className="text-muted-foreground/70"> — $10 once, for good.</span>
           </p>
         ) : null}
+
+        {/* Prices are set per country by the payment provider now, so no
+            figure is quoted anywhere in the app — the checkout shows the
+            right one. */}
+        <Link
+          href="/preview"
+          className="text-xs text-muted-foreground underline decoration-border underline-offset-4 transition-colors hover:text-foreground hover:decoration-foreground"
+        >
+          Preview Demo
+        </Link>
 
         <div className="ml-auto flex items-center gap-3">
           <ViewCounts />

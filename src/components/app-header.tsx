@@ -13,29 +13,28 @@ import { cn } from "@/lib/utils";
 interface NavItem {
   href: string;
   label: string;
-  /** Only for people who have records here. */
-  owner?: boolean;
+  /** Only for whoever runs the place. */
+  admin?: boolean;
   /** Only while the pencil is on. */
   editing?: boolean;
 }
 
 const NAV: NavItem[] = [
-  { href: "/", label: "Vitals", owner: true },
-  { href: "/nutrition", label: "Nutrition", owner: true },
-  { href: "/preview", label: "Preview" },
-  { href: "/analytics", label: "Analytics", owner: true, editing: true },
+  { href: "/", label: "Vitals" },
+  { href: "/nutrition", label: "Nutrition" },
+  { href: "/analytics", label: "Analytics", admin: true, editing: true },
 ];
 
 export function AppHeader() {
   const router = useRouter();
   const pathname = usePathname();
   const { signOut } = useSession();
-  const { personId, setPersonId, people, meId, canEdit } = usePerson();
-  const isOwner = meId !== null;
+  const { personId, setPersonId, people, meId, canEdit, isAdmin } = usePerson();
+  const signedIn = meId !== null;
 
   const nav = NAV.filter(
     (item) =>
-      (!item.owner || isOwner) && (!item.editing || canEdit(personId))
+      (!item.admin || isAdmin) && (!item.editing || canEdit(personId))
   );
 
   return (
@@ -70,6 +69,7 @@ export function AppHeader() {
           ))}
         </nav>
 
+        {/* A household of one gets its name; a household of more gets a switch. */}
         {people.length > 1 ? (
           <Tabs
             value={personId ?? undefined}
@@ -85,10 +85,12 @@ export function AppHeader() {
             </TabsList>
           </Tabs>
         ) : (
-          <span className="ml-auto" />
+          <span className="ml-auto truncate text-sm">
+            {people[0]?.display_name ?? ""}
+          </span>
         )}
 
-        {isOwner ? (
+        {signedIn ? (
           <Link
             href="/partner"
             title="Add your partner's data"
@@ -100,7 +102,7 @@ export function AppHeader() {
           </Link>
         ) : null}
 
-        {isOwner ? <EditModeToggle /> : null}
+        {signedIn ? <EditModeToggle /> : null}
 
         <Button
           variant="outline"

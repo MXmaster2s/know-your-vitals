@@ -12,7 +12,7 @@ import {
 } from "@/components/status-sections";
 import { Skeleton } from "@/components/ui/skeleton";
 import { usePerson } from "@/components/person-provider";
-import { usePersonData } from "@/lib/use-person-data";
+import type { PersonData } from "@/lib/use-person-data";
 import { dismiss, undismiss, type Marker } from "@/lib/data";
 import {
   CATEGORY_LABEL,
@@ -25,9 +25,16 @@ import {
   seriesAsOf,
 } from "@/lib/derive";
 
-export function Dashboard() {
+export function Dashboard({
+  data,
+  error,
+  refresh,
+}: {
+  data: PersonData | null;
+  error: string | null;
+  refresh: () => void;
+}) {
   const { personId, labelFor, canEdit } = usePerson();
-  const { data, error, refresh } = usePersonData();
   const [openMarker, setOpenMarker] = React.useState<Marker | null>(null);
   const [showHidden, setShowHidden] = React.useState(false);
   const [query, setQuery] = React.useState("");

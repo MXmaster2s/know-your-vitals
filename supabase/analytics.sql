@@ -43,7 +43,11 @@ create or replace function public.view_counts()
     from public.page_views
 $$;
 
-create or replace function public.visitor_log()
+-- households.sql later widens this with a paid_at column, and Postgres will
+-- not let `create or replace` change a return signature — drop first so the
+-- two files are idempotent in either order.
+drop function if exists public.visitor_log();
+create function public.visitor_log()
   returns table (email text, name text, provider text,
                  first_seen timestamptz, last_seen timestamptz, visits bigint)
   language sql stable security definer set search_path = public, auth as $$

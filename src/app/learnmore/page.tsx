@@ -79,11 +79,11 @@ export default function LearnMorePage() {
           <div className="flex flex-wrap items-end justify-between gap-6">
             <div className="space-y-2">
               <h2 className="font-serif text-2xl leading-tight sm:text-3xl">
-                Ten dollars, once.
+                One payment, for good.
               </h2>
               <p className="max-w-md text-sm text-muted-foreground">
-                No subscription, no renewal, no per-report charge. Bring as many
-                years of reports as you have.
+                No subscription, no renewal, no per-report charge. Priced for
+                where you live. Bring as many years of reports as you have.
               </p>
             </div>
             {CHECKOUT_URL ? (

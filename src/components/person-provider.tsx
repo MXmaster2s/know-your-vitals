@@ -1,7 +1,13 @@
 "use client";
 
 import * as React from "react";
-import { getPeople, type Person, type PersonId } from "@/lib/data";
+import {
+  ensureMe,
+  getDemoPeople,
+  getPeople,
+  type Person,
+  type PersonId,
+} from "@/lib/data";
 import { useSession } from "@/components/auth-provider";
 import { useEditMode } from "@/components/edit-mode";
 
@@ -15,8 +21,12 @@ interface PersonContextValue {
    *  editing on. Permission is enforced in the database as well; the mode is
    *  only about what the interface offers right now. */
   canEdit: (id: PersonId | null) => boolean;
-  /** The person the signed-in email belongs to, null if it matches nobody. */
+  /** Your own person — every signed-in account has one from first sign-in. */
   meId: PersonId | null;
+  /** Sees every household, analytics, uploads, settings. */
+  isAdmin: boolean;
+  /** Whether this provider is showing your own household or the demo one. */
+  roster: "mine" | "demo";
 }
 
 export const PersonContext = React.createContext<PersonContextValue>({
@@ -26,64 +36,71 @@ export const PersonContext = React.createContext<PersonContextValue>({
   labelFor: (id) => id ?? "",
   canEdit: () => false,
   meId: null,
+  isAdmin: false,
+  roster: "mine",
 });
 
 /**
- * Who the vault is tracking. The roster comes from the `people` table, so the
- * app carries no names of its own — seed whoever you like.
+ * Who the pages are about. By default that is your household — yourself, plus
+ * whoever shares your records. `roster="demo"` swaps in the demo household so
+ * a page can show what the tool looks like with real data; nest it inside the
+ * default one and only that subtree changes.
  */
-export function PersonProvider({ children }: { children: React.ReactNode }) {
+export function PersonProvider({
+  children,
+  roster = "mine",
+}: {
+  children: React.ReactNode;
+  roster?: "mine" | "demo";
+}) {
   const { session } = useSession();
   const { editing } = useEditMode();
   const [people, setPeople] = React.useState<Person[]>([]);
   const [personId, setPersonId] = React.useState<PersonId | null>(null);
+  const [me, setMe] = React.useState<Person | null>(null);
 
-  // Read through a ref so the roster fetch stays a mount-once effect.
   const emailRef = React.useRef<string | null>(null);
   emailRef.current = session?.user?.email?.toLowerCase() ?? null;
 
   React.useEffect(() => {
     let cancelled = false;
-    getPeople()
-      .then((rows) => {
-        if (cancelled) return;
-        setPeople(rows);
-        // Open on yourself. Falling back to the first row alphabetically meant
-        // the app greeted Rohit with Aditi's page on every refresh.
-        const mine = rows.find(
-          (r) => r.email?.toLowerCase() === emailRef.current
-        );
-        setPersonId((cur) => cur ?? mine?.id ?? rows[0]?.id ?? null);
-      })
-      .catch(() => {
-        /* the pages surface their own load errors */
-      });
+    (async () => {
+      // First sign-in creates your own row; every later one finds it.
+      const mine = roster === "mine" ? await ensureMe() : null;
+      const rows = roster === "demo" ? await getDemoPeople() : await getPeople();
+      if (cancelled) return;
+      setPeople(rows);
+      setMe(mine);
+      setPersonId((cur) => cur ?? mine?.id ?? rows[0]?.id ?? null);
+    })().catch(() => {
+      /* the pages surface their own load errors */
+    });
     return () => {
       cancelled = true;
     };
-  }, []);
-
-  const email = session?.user?.email?.toLowerCase() ?? null;
+  }, [roster]);
 
   const value = React.useMemo<PersonContextValue>(() => {
     const byId = new Map(people.map((p) => [p.id, p]));
-    const meId =
-      people.find((p) => p.email?.toLowerCase() === email)?.id ?? null;
+    const meId = me?.id ?? null;
+    const isAdmin = me?.is_admin === true;
     return {
       personId,
       setPersonId,
       people,
       labelFor: (id) => (id ? (byId.get(id)?.display_name ?? id) : ""),
       canEdit: (id) => {
-        if (!editing) return false;
-        if (id === null || meId === null) return false;
+        if (!editing || id === null || meId === null) return false;
+        // The demo household is someone else's; it is never editable here.
+        if (roster === "demo") return false;
         if (id === meId) return true;
-        // Whoever keeps the records may edit everyone's.
-        return people.find((p) => p.id === meId)?.can_edit_all === true;
+        return me?.can_edit_all === true || isAdmin;
       },
       meId,
+      isAdmin,
+      roster,
     };
-  }, [people, personId, email, editing]);
+  }, [people, personId, me, editing, roster]);
 
   return (
     <PersonContext.Provider value={value}>{children}</PersonContext.Provider>

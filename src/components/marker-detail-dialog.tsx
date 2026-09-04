@@ -1,16 +1,6 @@
 "use client";
 
 import * as React from "react";
-import {
-  CartesianGrid,
-  Line,
-  LineChart,
-  ReferenceArea,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
 import { Badge } from "@/components/ui/badge";
 import { CopyButton } from "@/components/copy-button";
 import { Button } from "@/components/ui/button";
@@ -22,6 +12,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
+import { TrendChart, type ChartRow } from "@/components/trend-chart";
 import { usePerson } from "@/components/person-provider";
 import {
   getAllReports,
@@ -29,6 +20,7 @@ import {
   type Marker,
   type Measurement,
   type PersonId,
+  type Report,
 } from "@/lib/data";
 import {
   buildMarkerCopy,
@@ -42,26 +34,14 @@ import {
 } from "@/lib/derive";
 
 
-/**
- * Chart `t` values are built from LOCAL midnight of `taken_on`, so read the
- * date back with local getters. Round-tripping through `toISOString()` (UTC)
- * shifts the date back a day in any UTC+ timezone.
- */
-function isoFromChartTime(t: number): string {
-  const d = new Date(t);
-  const mm = String(d.getMonth() + 1).padStart(2, "0");
-  const dd = String(d.getDate()).padStart(2, "0");
-  return `${d.getFullYear()}-${mm}-${dd}`;
-}
 
-interface ChartRow {
-  t: number;
-  [key: string]: number | string | null | undefined;
-}
 
 interface Fetched {
   measurements: Measurement[];
   labByReport: Map<string, string>;
+  /** Every visit, including ones where this marker was not measured — the
+   *  axis is built from these, not from the readings. */
+  reports: Report[];
 }
 
 /**
@@ -102,7 +82,7 @@ export function MarkerDetailDialog({
         if (cancelled) return;
         const labByReport = new Map<string, string>();
         for (const r of reports) if (r.lab) labByReport.set(r.id, r.lab);
-        setFetched({ measurements, labByReport });
+        setFetched({ measurements, labByReport, reports });
       })
       .catch((e) => {
         if (!cancelled) setError(e instanceof Error ? e.message : String(e));
@@ -126,10 +106,26 @@ export function MarkerDetailDialog({
   const canCompare = mine.length > 0 && theirs.length > 0;
   const showOther = compare && canCompare && other !== null;
 
-  // Merge both series into one time-keyed table so the tooltip sees one row.
+  // The axis is every visit the person has had — not every visit where THIS
+  // marker happened to be measured. Labs do not run the same panel each time,
+  // so a marker missing from a report shows as a gap on a fixed axis rather
+  // than quietly vanishing and making the remaining points look adjacent.
+  const axisDates = React.useMemo<number[]>(() => {
+    if (!fetched) return [];
+    const ids = new Set<string>([personId]);
+    if (showOther && other) ids.add(other);
+    const set = new Set<number>();
+    for (const r of fetched.reports) {
+      if (!ids.has(r.person_id) || r.planned) continue;
+      set.add(new Date(`${r.taken_on}T00:00:00`).getTime());
+    }
+    return [...set].sort((a, b) => a - b);
+  }, [fetched, personId, showOther, other]);
+
   const rows = React.useMemo<ChartRow[]>(() => {
     if (!fetched) return [];
     const byTime = new Map<number, ChartRow>();
+    for (const t of axisDates) byTime.set(t, { t });
     const visible = showOther ? fetched.measurements : mine;
     for (const m of visible) {
       const t = new Date(`${m.taken_on}T00:00:00`).getTime();
@@ -141,7 +137,7 @@ export function MarkerDetailDialog({
       byTime.set(t, row);
     }
     return [...byTime.values()].sort((a, b) => a.t - b.t);
-  }, [fetched, showOther]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [fetched, showOther, axisDates]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Ref-range band from the latest of MY measurements that printed a range.
   const banded = [...mine].reverse().find((m) => m.ref_low != null || m.ref_high != null);
@@ -223,71 +219,18 @@ export function MarkerDetailDialog({
             No readings yet.
           </p>
         ) : (
-          <div className="h-64 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={rows} margin={{ top: 8, right: 8, bottom: 0, left: -12 }}>
-                <CartesianGrid stroke="var(--border)" strokeDasharray="3 3" vertical={false} />
-                {/* Band comes from the CURRENT person's printed range; ranges
-                    are sex-specific, so hide it when both series are shown. */}
-                {banded && !showOther ? (
-                  <ReferenceArea
-                    y1={banded.ref_low != null ? Number(banded.ref_low) : yMin}
-                    y2={banded.ref_high != null ? Number(banded.ref_high) : yMax}
-                    fill="var(--chart-1)"
-                    fillOpacity={0.08}
-                    stroke="var(--chart-1)"
-                    strokeOpacity={0.25}
-                    strokeDasharray="4 4"
-                  />
-                ) : null}
-                <XAxis
-                  dataKey="t"
-                  type="number"
-                  scale="time"
-                  domain={["dataMin", "dataMax"]}
-                  tickFormatter={(t: number) => fmtDateShort(isoFromChartTime(t))}
-                  tick={{ fill: "var(--muted-foreground)", fontSize: 11 }}
-                  tickLine={false}
-                  axisLine={{ stroke: "var(--border)" }}
-                  ticks={rows.map((r) => r.t)}
-                />
-                <YAxis
-                  domain={[yMin, yMax]}
-                  tick={{ fill: "var(--muted-foreground)", fontSize: 11 }}
-                  tickLine={false}
-                  axisLine={false}
-                  width={48}
-                  tickFormatter={(v: number) => fmtValue(v)}
-                />
-                <Tooltip content={<TrendTooltip unitFallback={unit} />} />
-                <Line
-                  dataKey={personId}
-                  name={labelFor(personId)}
-                  type="monotone"
-                  connectNulls
-                  stroke="var(--chart-1)"
-                  strokeWidth={2}
-                  dot={{ r: 3, fill: "var(--chart-1)", strokeWidth: 0 }}
-                  activeDot={{ r: 5 }}
-                  isAnimationActive={false}
-                />
-                {showOther && other ? (
-                  <Line
-                    dataKey={other}
-                    name={labelFor(other)}
-                    type="monotone"
-                    connectNulls
-                    stroke="var(--chart-2)"
-                    strokeWidth={2}
-                    strokeDasharray="5 3"
-                    dot={{ r: 3, fill: "var(--chart-2)", strokeWidth: 0 }}
-                    activeDot={{ r: 5 }}
-                    isAnimationActive={false}
-                  />
-                ) : null}
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
+          <TrendChart
+            title={marker?.name ?? marker?.id ?? ""}
+            rows={rows}
+            axisDates={axisDates}
+            personId={personId}
+            other={showOther && other ? other : null}
+            banded={showOther ? null : (banded ?? null)}
+            yMin={yMin}
+            yMax={yMax}
+            unit={unit}
+            labelFor={labelFor}
+          />
         )}
 
         {ownSeries && !compare ? (
@@ -334,56 +277,5 @@ export function MarkerDetailDialog({
         </div>
       </DialogContent>
     </Dialog>
-  );
-}
-
-interface TooltipEntry {
-  dataKey?: string | number;
-  name?: string | number;
-  value?: number | string;
-  color?: string;
-  payload?: ChartRow;
-}
-
-function TrendTooltip({
-  active,
-  payload,
-  label,
-  unitFallback,
-}: {
-  active?: boolean;
-  payload?: TooltipEntry[];
-  label?: number;
-  unitFallback: string | null;
-}) {
-  if (!active || !payload || payload.length === 0 || label == null) return null;
-  const iso = isoFromChartTime(label);
-  return (
-    <div className="rounded-md border border-border bg-popover px-3 py-2 text-xs shadow-md">
-      <p className="mb-1 font-medium text-popover-foreground">{fmtDate(iso)}</p>
-      {payload.map((entry) => {
-        const key = String(entry.dataKey);
-        const row = entry.payload;
-        const lab = row?.[`${key}_lab`] as string | null | undefined;
-        const unit = (row?.[`${key}_unit`] as string | null | undefined) ?? unitFallback;
-        const flag = row?.[`${key}_flag`] as string | null | undefined;
-        return (
-          <p key={key} className="flex items-center gap-1.5 text-muted-foreground">
-            <span
-              className="inline-block size-2 rounded-full"
-              style={{ background: entry.color }}
-              aria-hidden
-            />
-            <span className="text-popover-foreground">{entry.name}</span>
-            <span className="tabular-nums text-popover-foreground">
-              {fmtValue(entry.value ?? "")}
-              {unit ? ` ${unit}` : ""}
-            </span>
-            {flag ? <span className="font-medium text-attention">{flag}</span> : null}
-            {lab ? <span>· {lab}</span> : null}
-          </p>
-        );
-      })}
-    </div>
   );
 }

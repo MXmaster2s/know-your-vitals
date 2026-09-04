@@ -6,9 +6,11 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { usePerson } from "@/components/person-provider";
 import { cn } from "@/lib/utils";
 import {
+  getUploads,
   getVisitTimes,
   getVisitors,
   stamp,
+  type Upload,
   type VisitTime,
   type Visitor,
 } from "@/lib/analytics";
@@ -28,15 +30,16 @@ export default function AnalyticsPage() {
   const [data, setData] = React.useState<{
     visitors: Visitor[];
     visits: VisitTime[];
+    uploads: Upload[];
   } | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [open, setOpen] = React.useState<Visitor | null>(null);
 
   React.useEffect(() => {
     let cancelled = false;
-    Promise.all([getVisitors(), getVisitTimes()])
-      .then(([visitors, visits]) => {
-        if (!cancelled) setData({ visitors, visits });
+    Promise.all([getVisitors(), getVisitTimes(), getUploads()])
+      .then(([visitors, visits, uploads]) => {
+        if (!cancelled) setData({ visitors, visits, uploads });
       })
       .catch((e) => {
         if (!cancelled) setError(e instanceof Error ? e.message : String(e));
@@ -132,6 +135,16 @@ export default function AnalyticsPage() {
                           {v.name ?? v.email.split("@")[0]}
                         </span>
                         {v.paid_at ? <PaidPill /> : null}
+                        {(() => {
+                          const n = data.uploads.filter(
+                            (u) => u.email === v.email.toLowerCase()
+                          ).length;
+                          return n > 0 ? (
+                            <span className="rounded-full border px-2 py-0.5 text-[10px] tabular-nums text-muted-foreground">
+                              {n} {n === 1 ? "report" : "reports"}
+                            </span>
+                          ) : null;
+                        })()}
                       </span>
                       <span className="mt-0.5 block break-all text-xs text-muted-foreground">
                         {v.email}
@@ -148,6 +161,7 @@ export default function AnalyticsPage() {
       <GuestDialog
         guest={open}
         visits={data.visits}
+        uploads={data.uploads}
         onClose={() => setOpen(null)}
       />
     </div>

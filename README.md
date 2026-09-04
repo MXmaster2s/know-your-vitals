@@ -94,6 +94,28 @@ role, which Supabase grants EXECUTE explicitly. Since the anon key ships in the
 browser bundle, any function `anon` can execute is open to the internet. Revoke
 from `anon` by name.
 
+## More than one household
+
+Run `supabase/households.sql` to let strangers sign in without seeing each
+other. A *household* is the unit of privacy: the people who set the vault up
+share one, and everyone who signs in afterwards gets their own, keyed to their
+auth id. Reads are scoped to your household plus one *demo* household, which
+`/preview` shows to everyone as the worked example.
+
+`ensure_me()` creates the caller's own person row on first sign-in — it is the
+only path that creates a person without an admin, and it can only ever create
+the caller's own. Once everyone has a row, "has a row in `people`" stops
+meaning anything, so everything that matters is gated on `is_admin()` instead.
+Two details that are easy to miss: a row policy says which rows you may update
+and nothing about which columns, so `is_admin` and `household` are protected
+with a column-level grant; and `readers` and `app_settings` must be admin-only,
+or a visitor could mark themselves paid or open the whole vault.
+
+Uploaded reports go to a private `reports` bucket under the uploader's own
+folder — PDF only, 5 MB each, enforced by the bucket as well as the page — and
+a `report_uploads` ledger records who sent what, so the Analytics page can list
+them and mint a short-lived download link.
+
 ## Who may edit what
 
 With more than one person in the vault, read is shared and writes are not: by

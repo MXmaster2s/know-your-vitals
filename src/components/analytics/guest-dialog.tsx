@@ -7,7 +7,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { ago, shortDate, stamp, type VisitTime, type Visitor } from "@/lib/analytics";
+import * as React from "react";
+import { Download } from "lucide-react";
+import { signedReportUrl } from "@/lib/data";
+import { ago, shortDate, stamp, type Upload, type VisitTime, type Visitor } from "@/lib/analytics";
 
 /**
  * Guest analytics — everything known about one person, which is deliberately
@@ -18,10 +21,12 @@ import { ago, shortDate, stamp, type VisitTime, type Visitor } from "@/lib/analy
 export function GuestDialog({
   guest,
   visits,
+  uploads,
   onClose,
 }: {
   guest: Visitor | null;
   visits: VisitTime[];
+  uploads: Upload[];
   onClose: () => void;
 }) {
   if (!guest) return null;
@@ -33,6 +38,10 @@ export function GuestDialog({
   const byPath = new Map<string, number>();
   for (const v of mine) byPath.set(v.path, (byPath.get(v.path) ?? 0) + 1);
   const pages = [...byPath.entries()].sort((a, b) => b[1] - a[1]);
+
+  const files = uploads
+    .filter((u) => u.email === guest.email.toLowerCase())
+    .sort((a, b) => b.uploaded_at.localeCompare(a.uploaded_at));
 
   const facts: [string, string][] = [
     ["Visits", guest.visits.toLocaleString("en-IN")],
@@ -89,6 +98,28 @@ export function GuestDialog({
           </section>
         ) : null}
 
+        {files.length > 0 ? (
+          <section className="space-y-1.5">
+            <h3 className="text-[11px] uppercase tracking-wider text-muted-foreground/70">
+              Reports uploaded
+            </h3>
+            <ul className="divide-y rounded-lg border">
+              {files.map((f) => (
+                <li key={f.path} className="flex items-center gap-3 px-3 py-1.5 text-sm">
+                  <span className="min-w-0 flex-1 truncate">{f.file_name}</span>
+                  <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">
+                    {shortDate(f.uploaded_at)}
+                    {f.size_bytes
+                      ? ` · ${(f.size_bytes / 1024).toLocaleString("en-IN", { maximumFractionDigits: 0 })} KB`
+                      : ""}
+                  </span>
+                  <DownloadLink path={f.path} name={f.file_name} />
+                </li>
+              ))}
+            </ul>
+          </section>
+        ) : null}
+
         <section className="space-y-1.5">
           <h3 className="text-[11px] uppercase tracking-wider text-muted-foreground/70">
             Every visit
@@ -115,5 +146,31 @@ export function GuestDialog({
         </section>
       </DialogContent>
     </Dialog>
+  );
+}
+
+/** Links are minted on demand and expire in an hour — a listing page should
+ *  not carry a pile of live download URLs in its markup. */
+function DownloadLink({ path, name }: { path: string; name: string }) {
+  const [busy, setBusy] = React.useState(false);
+  return (
+    <button
+      type="button"
+      disabled={busy}
+      aria-label={`Download ${name}`}
+      title="Download"
+      onClick={async () => {
+        setBusy(true);
+        try {
+          const url = await signedReportUrl(path);
+          window.open(url, "_blank", "noopener,noreferrer");
+        } finally {
+          setBusy(false);
+        }
+      }}
+      className="grid size-7 shrink-0 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
+    >
+      <Download className="size-3.5" aria-hidden />
+    </button>
   );
 }

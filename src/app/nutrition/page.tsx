@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { DayTable } from "@/components/nutrition/day-table";
+import { UploadReports } from "@/components/upload-reports";
 import { DayTargets } from "@/components/nutrition/day-targets";
 import { MealDialog } from "@/components/nutrition/meal-dialog";
 import { ModuleHeading } from "@/components/nutrition/module-heading";
@@ -29,6 +30,9 @@ export default function NutritionPage() {
   }
 
   if (!data || !personId) return <NutritionSkeleton />;
+
+  // Nothing to plan around yet — the reports come first.
+  if (data.meals.length === 0) return <UploadReports />;
 
   const target =
     data.targets.find((t) => t.is_active) ?? data.targets[0] ?? null;

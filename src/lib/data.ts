@@ -13,6 +13,10 @@ export interface Person {
   email: string | null;
   /** Keeps the whole household's records, not only their own. */
   can_edit_all: boolean;
+  /** The unit of privacy. Reads are scoped to yours, plus the demo one. */
+  household: string | null;
+  /** Sees every household, analytics, uploads, settings. */
+  is_admin: boolean;
 }
 
 export interface Report {
@@ -83,8 +87,35 @@ async function unwrap<T>(query: PromiseLike<QueryResult<T[]>>): Promise<T[]> {
   return data ?? [];
 }
 
+/** Everyone in MY household — one person for a newcomer, two for the family. */
 export function getPeople(): Promise<Person[]> {
-  return unwrap<Person>(supabase.from("people").select("*").order("id"));
+  return unwrap<Person>(supabase.rpc("my_people"));
+}
+
+/** The household /preview shows to everyone who signs in. */
+export function getDemoPeople(): Promise<Person[]> {
+  return unwrap<Person>(supabase.rpc("demo_people"));
+}
+
+/** Creates the caller's own person row on first sign-in; a no-op after. It is
+ *  the only path that creates a person without an admin, and it can only ever
+ *  create the caller's own. */
+export async function ensureMe(): Promise<Person> {
+  const { data, error } = await supabase.rpc("ensure_me");
+  if (error) throw new Error(error.message);
+  return (Array.isArray(data) ? data[0] : data) as Person;
+}
+
+export interface Slots {
+  served: number;
+  total: number;
+}
+
+export async function getSlots(): Promise<Slots> {
+  const { data, error } = await supabase.rpc("slots_status");
+  if (error) throw new Error(error.message);
+  const row = Array.isArray(data) ? data[0] : data;
+  return { served: Number(row?.served ?? 0), total: Number(row?.total ?? 20) };
 }
 
 export function getMarkers(): Promise<Marker[]> {
@@ -260,4 +291,63 @@ export async function getViewCounts(): Promise<ViewCounts | null> {
   if (error) throw new Error(error.message);
   const row = Array.isArray(data) ? data[0] : data;
   return row ? { last_24h: Number(row.last_24h), lifetime: Number(row.lifetime) } : null;
+}
+
+// ---- Uploaded reports ----------------------------------------------------
+
+export interface ReportUpload {
+  id: string;
+  uid: string;
+  email: string;
+  path: string;
+  file_name: string;
+  size_bytes: number | null;
+  uploaded_at: string;
+}
+
+export const REPORT_MAX_BYTES = 5 * 1024 * 1024;
+
+/** Puts one PDF in the private `reports` bucket under the caller's own folder
+ *  and writes the ledger row the Analytics page reads. Storage enforces the
+ *  type and size again server-side; the client check is for the message. */
+export async function uploadReport(
+  file: File,
+  user: { id: string; email: string }
+): Promise<ReportUpload> {
+  const safe = file.name.replace(/[^\w.\-]+/g, "_").slice(0, 120);
+  const path = `${user.id}/${Date.now()}-${safe}`;
+  const { error: upErr } = await supabase.storage
+    .from("reports")
+    .upload(path, file, { contentType: "application/pdf", upsert: false });
+  if (upErr) throw new Error(upErr.message);
+
+  const { data, error } = await supabase
+    .from("report_uploads")
+    .insert({
+      uid: user.id,
+      email: user.email,
+      path,
+      file_name: file.name,
+      size_bytes: file.size,
+    })
+    .select("*")
+    .single();
+  if (error) throw new Error(error.message);
+  return data as ReportUpload;
+}
+
+export function getMyUploads(): Promise<ReportUpload[]> {
+  return unwrap<ReportUpload>(
+    supabase.from("report_uploads").select("*").order("uploaded_at", { ascending: false })
+  );
+}
+
+/** A short-lived link to one file. Storage RLS decides whether the caller may
+ *  have it at all, so a guest asking for someone else's path gets an error. */
+export async function signedReportUrl(path: string): Promise<string> {
+  const { data, error } = await supabase.storage
+    .from("reports")
+    .createSignedUrl(path, 60 * 60);
+  if (error) throw new Error(error.message);
+  return data.signedUrl;
 }

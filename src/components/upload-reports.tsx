@@ -3,39 +3,126 @@
 import * as React from "react";
 import { FileText, Upload, X } from "lucide-react";
 import Link from "next/link";
+import posthog from "posthog-js";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { useSession } from "@/components/auth-provider";
+import {
+  REPORT_MAX_BYTES,
+  getSlots,
+  uploadReport,
+  type ReportUpload,
+  type Slots,
+} from "@/lib/data";
 import { cn } from "@/lib/utils";
 
+const CHECKOUT_URL = process.env.NEXT_PUBLIC_CHECKOUT_URL;
+
+type Rejection = { name: string; reason: "type" | "size" };
+
+function vet(list: File[]): { ok: File[]; bad: Rejection[] } {
+  const ok: File[] = [];
+  const bad: Rejection[] = [];
+  for (const f of list) {
+    const isPdf =
+      f.type === "application/pdf" || f.name.toLowerCase().endsWith(".pdf");
+    if (!isPdf) bad.push({ name: f.name, reason: "type" });
+    else if (f.size > REPORT_MAX_BYTES) bad.push({ name: f.name, reason: "size" });
+    else ok.push(f);
+  }
+  return { ok, bad };
+}
+
 /**
- * The first screen someone sees with nothing in the app yet. An empty screen
- * is an invitation, so it asks for the one thing that starts everything: the
- * last blood test.
+ * The first screen for anyone with nothing in the app yet. An empty screen is
+ * an invitation, so it asks for the one thing that starts everything.
  *
- * It is honest about what happens next. Reading reports is not automatic yet,
- * and a dropzone that silently swallows a file would be worse than one that
- * says so.
+ * Files really do go somewhere — a private bucket, under the uploader's own
+ * folder — and what happens after is said in words rather than implied by a
+ * spinner: the next step is access, then the reports get read.
  */
 export function UploadReports({
-  title = "Start with your last blood test",
-  blurb = "Drop in the PDFs your lab gave you — any lab, any format. Your dashboard gets built from what is in them.",
+  title = "Find hidden trends in your blood tests",
+  blurb,
 }: {
   title?: string;
-  blurb?: string;
+  /** Replaces the default line under the title; the Preview demo link is
+   *  part of the default and goes with it. */
+  blurb?: React.ReactNode;
 }) {
-  const [files, setFiles] = React.useState<File[]>([]);
+  const { session } = useSession();
+  const [queued, setQueued] = React.useState<File[]>([]);
+  const [rejected, setRejected] = React.useState<Rejection[] | null>(null);
+  const [done, setDone] = React.useState<ReportUpload[] | null>(null);
+  const [busy, setBusy] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
   const [over, setOver] = React.useState(false);
-  const input = React.useRef<HTMLInputElement>(null);
+  const [slots, setSlots] = React.useState<Slots | null>(null);
+
+  React.useEffect(() => {
+    getSlots().then(setSlots).catch(() => {});
+  }, []);
 
   const add = (list: FileList | null) => {
     if (!list) return;
-    setFiles((prev) => [...prev, ...Array.from(list)]);
+    const { ok, bad } = vet(Array.from(list));
+    if (bad.length) {
+      setRejected(bad);
+      posthog.capture("upload_rejected", {
+        count: bad.length,
+        by_type: bad.filter((b) => b.reason === "type").length,
+        by_size: bad.filter((b) => b.reason === "size").length,
+      });
+    }
+    if (ok.length) setQueued((prev) => [...prev, ...ok]);
+  };
+
+  const submit = async () => {
+    const user = session?.user;
+    if (!user?.email || queued.length === 0) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const out: ReportUpload[] = [];
+      for (const f of queued) {
+        out.push(await uploadReport(f, { id: user.id, email: user.email }));
+      }
+      setQueued([]);
+      setDone(out);
+      posthog.capture("upload_succeeded", { count: out.length });
+      posthog.capture("payment_prompt_shown", { after_upload: true });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
   };
 
   return (
     <div className="mx-auto flex w-full max-w-xl flex-col items-center gap-6 py-12 text-center sm:py-20">
       <div className="space-y-2">
         <h1 className="font-serif text-2xl leading-tight sm:text-3xl">{title}</h1>
-        <p className="text-sm text-muted-foreground">{blurb}</p>
+        <p className="text-sm text-muted-foreground">
+          {blurb ?? (
+            <>
+              Analyse your past blood reports to make your personalised health
+              dashboard.{" "}
+              <Link
+                href="/preview"
+                className="text-foreground underline decoration-border underline-offset-4 hover:decoration-foreground"
+              >
+                Preview demo
+              </Link>{" "}
+              to see how it will look.
+            </>
+          )}
+        </p>
       </div>
 
       <label
@@ -64,22 +151,24 @@ export function UploadReports({
           <span className="text-muted-foreground">or drop them here</span>
         </span>
         <span className="text-[11px] text-muted-foreground/70">
-          PDFs, or photos of a printout
+          PDF only, up to 5 MB each
         </span>
         <input
-          ref={input}
           type="file"
           multiple
-          accept="application/pdf,image/*"
+          accept="application/pdf"
           className="sr-only"
-          onChange={(e) => add(e.target.files)}
+          onChange={(e) => {
+            add(e.target.files);
+            e.target.value = "";
+          }}
         />
       </label>
 
-      {files.length > 0 ? (
-        <div className="w-full space-y-2 text-left">
+      {queued.length > 0 ? (
+        <div className="w-full space-y-3 text-left">
           <ul className="divide-y rounded-xl border bg-card">
-            {files.map((f, i) => (
+            {queued.map((f, i) => (
               <li key={`${f.name}-${i}`} className="flex items-center gap-3 px-3 py-2.5">
                 <FileText className="size-4 shrink-0 text-muted-foreground" strokeWidth={1.5} aria-hidden />
                 <span className="min-w-0 flex-1 truncate text-sm">{f.name}</span>
@@ -89,7 +178,8 @@ export function UploadReports({
                 <button
                   type="button"
                   aria-label={`Remove ${f.name}`}
-                  onClick={() => setFiles((prev) => prev.filter((_, j) => j !== i))}
+                  disabled={busy}
+                  onClick={() => setQueued((prev) => prev.filter((_, j) => j !== i))}
                   className="grid size-6 shrink-0 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                 >
                   <X className="size-3.5" aria-hidden />
@@ -97,17 +187,116 @@ export function UploadReports({
               </li>
             ))}
           </ul>
-          {/* Said plainly rather than implied by a spinner that never resolves. */}
-          <p className="px-1 text-[11px] text-muted-foreground">
-            Reading reports is not automatic yet — they are read by hand, and
-            you will get an email when your dashboard is ready.
-          </p>
+          {error ? (
+            <p role="alert" className="text-xs text-destructive">
+              {error}
+            </p>
+          ) : null}
+          <Button className="w-full cursor-pointer" disabled={busy} onClick={submit}>
+            {busy
+              ? "Uploading…"
+              : `Upload ${queued.length} ${queued.length === 1 ? "report" : "reports"}`}
+          </Button>
         </div>
       ) : null}
+
+      {slots ? <SlotsLeft slots={slots} /> : null}
 
       <Button asChild variant="outline" className="cursor-pointer">
         <Link href="/learnmore">Learn more</Link>
       </Button>
+
+      {/* Turned away — say exactly why, and which ones. */}
+      {rejected ? (
+        <Dialog open onOpenChange={(o) => !o && setRejected(null)}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle className="font-serif text-xl">
+                Only PDFs, up to 5 MB each
+              </DialogTitle>
+              <DialogDescription>
+                {rejected.length === 1 ? "This one" : "These"} didn&apos;t go in.
+              </DialogDescription>
+            </DialogHeader>
+            <ul className="divide-y rounded-lg border text-sm">
+              {rejected.map((r, i) => (
+                <li key={`${r.name}-${i}`} className="flex items-baseline justify-between gap-3 px-3 py-2">
+                  <span className="min-w-0 truncate">{r.name}</span>
+                  <span className="shrink-0 text-xs text-muted-foreground">
+                    {r.reason === "type" ? "not a PDF" : "over 5 MB"}
+                  </span>
+                </li>
+              ))}
+            </ul>
+            <p className="text-xs text-muted-foreground">
+              Most labs email a PDF. If yours sent a photo, a scan-to-PDF app
+              on your phone turns it into one.
+            </p>
+          </DialogContent>
+        </Dialog>
+      ) : null}
+
+      {/* In — and the next step, without a number. The checkout carries the
+          right price for the country; quoting one here would be wrong for
+          most people who read it. */}
+      {done ? (
+        <Dialog open onOpenChange={(o) => !o && setDone(null)}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle className="font-serif text-xl">
+                {done.length === 1 ? "Report received" : `${done.length} reports received`}
+              </DialogTitle>
+              <DialogDescription>
+                They are in, safely, under your account. The next step is
+                access — once that is done, they get read and your dashboard is
+                built from what is in them.
+              </DialogDescription>
+            </DialogHeader>
+            {CHECKOUT_URL ? (
+              <Button asChild className="cursor-pointer">
+                <a href={CHECKOUT_URL} target="_blank" rel="noopener noreferrer">
+                  Get access
+                </a>
+              </Button>
+            ) : null}
+            <p className="text-xs text-muted-foreground">
+              Already have access? Nothing more to do — you will get an email
+              when your dashboard is ready.
+            </p>
+          </DialogContent>
+        </Dialog>
+      ) : null}
+    </div>
+  );
+}
+
+/**
+ * How many of the places are taken, as twenty marks rather than a fraction —
+ * you can see the shape of "most are gone" or "plenty left" before reading.
+ */
+export function SlotsLeft({ slots }: { slots: Slots }) {
+  const total = Math.max(slots.total, 1);
+  const served = Math.min(slots.served, total);
+  return (
+    <div className="w-full max-w-sm space-y-2">
+      <div
+        className="flex gap-1"
+        role="img"
+        aria-label={`${served} of ${total} places taken`}
+      >
+        {Array.from({ length: total }).map((_, i) => (
+          <span
+            key={i}
+            className={cn(
+              "h-1.5 flex-1 rounded-full",
+              i < served ? "bg-foreground" : "bg-muted"
+            )}
+          />
+        ))}
+      </div>
+      <p className="text-[11px] tabular-nums text-muted-foreground">
+        {served} of {total} places taken · open to the first {total} people
+      </p>
     </div>
   );
 }

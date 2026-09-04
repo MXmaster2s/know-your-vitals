@@ -30,7 +30,16 @@ async function rpc<T>(fn: string): Promise<T[]> {
   return (data ?? []) as T[];
 }
 
+export interface Upload {
+  email: string;
+  path: string;
+  file_name: string;
+  size_bytes: number | null;
+  uploaded_at: string;
+}
+
 export const getVisitors = () => rpc<Visitor>("visitor_log");
+export const getUploads = () => rpc<Upload>("all_uploads");
 export const getVisitTimes = () => rpc<VisitTime>("visit_times");
 export const getPageTotals = () => rpc<PageTotal>("page_totals");
 
