@@ -401,3 +401,39 @@ export async function createMeal(input: {
   const { error } = await supabase.from("meals").insert(input);
   if (error) throw new Error(error.message);
 }
+
+// ---- MCP addresses -------------------------------------------------------
+
+/** One key the account has minted for an AI. The plaintext is never stored;
+ *  what the table keeps is a hash, and the browser is not even granted that
+ *  column — this is the whole of what it may read. */
+export interface McpToken {
+  id: string;
+  label: string;
+  created_at: string;
+  last_used_at: string | null;
+  revoked_at: string | null;
+}
+
+export function getMcpTokens(): Promise<McpToken[]> {
+  return unwrap<McpToken>(
+    supabase
+      .from("mcp_tokens")
+      .select("id, label, created_at, last_used_at, revoked_at")
+      .is("revoked_at", null)
+      .order("created_at", { ascending: false })
+  );
+}
+
+/** Mints a key and returns the plaintext — the only time it exists outside
+ *  the database's hash. Show it once; there is no way to fetch it again. */
+export async function createMcpToken(label: string): Promise<string> {
+  const { data, error } = await supabase.rpc("mcp_token_create", { p_label: label });
+  if (error) throw new Error(error.message);
+  return String(data);
+}
+
+export async function revokeMcpToken(id: string): Promise<void> {
+  const { error } = await supabase.rpc("mcp_token_revoke", { p_id: id });
+  if (error) throw new Error(error.message);
+}

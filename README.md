@@ -116,6 +116,38 @@ folder — PDF only, 5 MB each, enforced by the bucket as well as the page — a
 a `report_uploads` ledger records who sent what, so the Analytics page can list
 them and mint a short-lived download link.
 
+## Connect an AI (MCP)
+
+Run `supabase/mcp.sql` and the site gains an MCP server at `/mcp/<token>`, so
+ChatGPT or Claude can read a household's data without anyone copying and
+pasting. The server is a Cloudflare Pages Function (`functions/mcp/`) — it
+deploys with the static site and needs two secrets, set once:
+
+```bash
+wrangler pages secret put SUPABASE_URL --project-name=<your project>
+wrangler pages secret put SUPABASE_SERVICE_KEY --project-name=<your project>
+```
+
+The token is the whole credential, and the design leans on three things:
+
+- **Minted by the owner, shown once, stored as a hash.** `mcp_token_create()`
+  returns the plaintext to the signed-in browser and keeps only its SHA-256, so
+  a copy of the database contains no working key. The browser is not even
+  granted the hash column, and no one — not an admin — can list another
+  account's tokens.
+- **One function, service role only.** The server hashes the token and calls
+  `mcp_call(hash, tool, args)`, which nothing in the browser bundle can execute
+  — revoked from `anon`, `authenticated` and `public` by name, and checked
+  again inside the function. It resolves the owner, stamps `last_used_at`, and
+  answers scoped to that household. Read-only.
+- **Stateless transport.** Streamable HTTP without sessions or SSE: one POST,
+  one JSON reply. `initialize` verifies the token, so a wrong address fails
+  when it is added rather than at the first question.
+
+Four tools — `overview`, `marker`, `nutrition`, `reports`. The signed-in page
+at `/chatgpt` mints and revokes addresses and carries the setup steps for both
+apps.
+
 ## Who may edit what
 
 With more than one person in the vault, read is shared and writes are not: by
@@ -204,7 +236,8 @@ is:
   still returns nothing.** (Self-hosted GoTrue ships with signup enabled, so do
   not assume "authenticated" means "invited".)
 - The service-role key is never used by the app and must never be put in
-  `.env.local`.
+  `.env.local`. The MCP function uses it server-side, as a Pages secret that
+  never reaches a browser.
 
 ### Readers, owners and viewers
 
@@ -239,7 +272,7 @@ The service worker deliberately never caches API or auth responses, so a signed
 ## Stack
 
 Next.js 16 (static export) · React 19 · Tailwind 4 · shadcn/ui · Recharts ·
-Supabase (Postgres + Auth).
+Supabase (Postgres + Auth) · one Cloudflare Pages Function for MCP.
 
 ## Licence
 

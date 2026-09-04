@@ -44,3 +44,6 @@ next-env.d.ts
 # deploy artefacts
 .wrangler/
 .playwright-cli/
+
+# wrangler local secrets
+.dev.vars
