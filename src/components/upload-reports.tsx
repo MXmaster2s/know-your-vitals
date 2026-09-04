@@ -15,6 +15,8 @@ import {
 import { useSession } from "@/components/auth-provider";
 import {
   REPORT_MAX_BYTES,
+  deleteReport,
+  getMyUploads,
   getSlots,
   uploadReport,
   type ReportUpload,
@@ -64,9 +66,12 @@ export function UploadReports({
   const [error, setError] = React.useState<string | null>(null);
   const [over, setOver] = React.useState(false);
   const [slots, setSlots] = React.useState<Slots | null>(null);
+  const [mine, setMine] = React.useState<ReportUpload[] | null>(null);
+  const [removing, setRemoving] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     getSlots().then(setSlots).catch(() => {});
+    getMyUploads().then(setMine).catch(() => setMine([]));
   }, []);
 
   const add = (list: FileList | null) => {
@@ -95,6 +100,7 @@ export function UploadReports({
       }
       setQueued([]);
       setDone(out);
+      setMine((prev) => [...out, ...(prev ?? [])]);
       posthog.capture("upload_succeeded", { count: out.length });
       posthog.capture("payment_prompt_shown", { after_upload: true });
     } catch (e) {
@@ -200,6 +206,26 @@ export function UploadReports({
         </div>
       ) : null}
 
+      {mine && mine.length > 0 ? (
+        <MyReports
+          uploads={mine}
+          removing={removing}
+          onDelete={async (u) => {
+            setRemoving(u.path);
+            setError(null);
+            try {
+              await deleteReport(u.path);
+              setMine((prev) => (prev ?? []).filter((x) => x.path !== u.path));
+              posthog.capture("upload_deleted");
+            } catch (e) {
+              setError(e instanceof Error ? e.message : String(e));
+            } finally {
+              setRemoving(null);
+            }
+          }}
+        />
+      ) : null}
+
       {slots ? <SlotsLeft slots={slots} /> : null}
 
       <Button asChild variant="outline" className="cursor-pointer">
@@ -267,6 +293,60 @@ export function UploadReports({
         </Dialog>
       ) : null}
     </div>
+  );
+}
+
+/**
+ * What is already here. Sits under the dropzone because the dropzone is the
+ * invitation and this is the record of having accepted it. Deleting really
+ * deletes — the file leaves the server, not just the list — so the row says
+ * so rather than leaving someone to wonder.
+ */
+export function MyReports({
+  uploads,
+  removing,
+  onDelete,
+}: {
+  uploads: ReportUpload[];
+  removing: string | null;
+  onDelete: (u: ReportUpload) => void;
+}) {
+  return (
+    <section className="w-full space-y-2 text-left">
+      <h2 className="px-1 text-[11px] uppercase tracking-wider text-muted-foreground/70">
+        Your reports
+      </h2>
+      <ul className="divide-y rounded-xl border bg-card">
+        {uploads.map((u) => (
+          <li key={u.path} className="flex items-center gap-3 px-3 py-2.5">
+            <FileText className="size-4 shrink-0 text-muted-foreground" strokeWidth={1.5} aria-hidden />
+            <span className="min-w-0 flex-1 truncate text-sm">{u.file_name}</span>
+            <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">
+              {new Date(u.uploaded_at).toLocaleDateString("en-GB", {
+                day: "numeric",
+                month: "short",
+              })}
+              {u.size_bytes
+                ? ` · ${(u.size_bytes / 1024).toLocaleString("en-IN", { maximumFractionDigits: 0 })} KB`
+                : ""}
+            </span>
+            <button
+              type="button"
+              disabled={removing === u.path}
+              aria-label={`Delete ${u.file_name}`}
+              title="Delete this report"
+              onClick={() => onDelete(u)}
+              className="grid size-6 shrink-0 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-40"
+            >
+              <X className="size-3.5" aria-hidden />
+            </button>
+          </li>
+        ))}
+      </ul>
+      <p className="px-1 text-[11px] text-muted-foreground">
+        Deleting a report removes the file from the server as well.
+      </p>
+    </section>
   );
 }
 

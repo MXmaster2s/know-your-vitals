@@ -1,49 +1,57 @@
 "use client";
 
 import * as React from "react";
-import Link from "next/link";
 import { Dashboard } from "@/components/dashboard";
 import NutritionPage from "@/app/nutrition/page";
-import { PersonProvider } from "@/components/person-provider";
+import { PersonProvider, usePerson } from "@/components/person-provider";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { usePersonData } from "@/lib/use-person-data";
 
 /**
  * The same tool, filled with two real people's records — the only honest way
- * to show what it does. The Vitals / Nutrition switch here is the page's own,
- * not the navbar's: the navbar stays about YOU, and this is about them.
+ * to show what it does. They appear by role rather than by name: a stranger
+ * should be able to read the demo without learning whose blood work it is.
+ *
+ * Both switches live on the page, not in the navbar. The navbar is about you;
+ * this page is about them, and stacking whose-data above which-view says that
+ * without a caption.
  */
 export default function PreviewPage() {
+  return (
+    <PersonProvider roster="demo">
+      <PreviewBody />
+    </PersonProvider>
+  );
+}
+
+function PreviewBody() {
+  const { people, personId, setPersonId, labelFor } = usePerson();
   const [view, setView] = React.useState<"vitals" | "nutrition">("vitals");
 
   return (
-    <PersonProvider roster="demo">
-      <div className="space-y-6">
-        <div className="flex flex-wrap items-center gap-3 rounded-xl border border-dashed bg-card/40 px-4 py-3">
-          <p className="min-w-0 flex-1 text-sm">
-            <span className="font-medium">Someone else&apos;s data.</span>{" "}
-            <span className="text-muted-foreground">
-              Two real people, eighteen months of blood work. Yours looks like
-              this once you{" "}
-              <Link
-                href="/"
-                className="text-foreground underline decoration-border underline-offset-4 hover:decoration-foreground"
-              >
-                upload your reports
-              </Link>
-              .
-            </span>
-          </p>
-          <Tabs value={view} onValueChange={(v) => setView(v as typeof view)}>
+    <div className="space-y-6">
+      <div className="flex flex-col items-start gap-2">
+        {people.length > 1 ? (
+          <Tabs value={personId ?? undefined} onValueChange={setPersonId}>
             <TabsList>
-              <TabsTrigger value="vitals">Vitals</TabsTrigger>
-              <TabsTrigger value="nutrition">Nutrition</TabsTrigger>
+              {people.map((p) => (
+                <TabsTrigger key={p.id} value={p.id}>
+                  {labelFor(p.id)}
+                </TabsTrigger>
+              ))}
             </TabsList>
           </Tabs>
-        </div>
-        {view === "vitals" ? <DemoVitals /> : <NutritionPage />}
+        ) : null}
+        <Tabs value={view} onValueChange={(v) => setView(v as typeof view)}>
+          <TabsList>
+            <TabsTrigger value="vitals">Vitals</TabsTrigger>
+            <TabsTrigger value="nutrition">Nutrition</TabsTrigger>
+          </TabsList>
+        </Tabs>
       </div>
-    </PersonProvider>
+
+      {view === "vitals" ? <DemoVitals /> : <NutritionPage />}
+    </div>
   );
 }
 

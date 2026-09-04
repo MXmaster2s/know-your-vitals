@@ -36,8 +36,15 @@ $$;
 update public.people set household = 'home' where household is null;
 insert into public.app_settings (key, enabled, value, note) values
   ('demo_household', true, 'home', 'Which household /preview shows to everyone'),
-  ('slots',          true, '20',   'How many people the tool is open to right now')
+  ('slots',          true, '20',   'How many people the tool is open to right now'),
+  -- Seats spoken for outside the payment flow. Separate from the real paid
+  -- count so the two never get confused; slots_status() adds them.
+  ('slots_offset',   true, '0',    'Seats taken before the counter went live')
 on conflict (key) do nothing;
+
+-- /preview shows real people to strangers, so it names them by role. Their own
+-- view keeps display_name; leave this null for anyone not in the demo.
+alter table public.people add column if not exists demo_label text;
 
 create or replace function public.my_household() returns text
   language sql stable security definer set search_path = public as $$
@@ -98,8 +105,11 @@ $$;
 create or replace function public.slots_status()
   returns table (served bigint, total int)
   language sql stable security definer set search_path = public as $$
-  select (select count(*) from public.readers where paid_at is not null),
-         coalesce((select s.value::int from public.app_settings s where s.key = 'slots'), 20)
+  select coalesce((select s.value::bigint from public.app_settings s
+                    where s.key = 'slots_offset'), 0)
+         + (select count(*) from public.readers where paid_at is not null),
+         coalesce((select s.value::int from public.app_settings s
+                    where s.key = 'slots'), 20)
 $$;
 
 -- ------------------------------------------------------- policies ----
@@ -201,8 +211,13 @@ create policy insert_own on public.report_uploads for insert to authenticated
               and split_part(path, '/', 1) = auth.uid()::text);
 create policy read_own_or_admin on public.report_uploads for select to authenticated
   using (uid = auth.uid()::text or public.is_admin());
+-- Deleting a report removes the file AND its ledger row; without this the list
+-- keeps showing something that is no longer there.
+drop policy if exists delete_own on public.report_uploads;
+create policy delete_own on public.report_uploads for delete to authenticated
+  using (uid = auth.uid()::text);
 revoke all on public.report_uploads from anon;
-grant select, insert on public.report_uploads to authenticated;
+grant select, insert, delete on public.report_uploads to authenticated;
 
 create or replace function public.all_uploads()
   returns table (email text, path text, file_name text, size_bytes bigint, uploaded_at timestamptz)

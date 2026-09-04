@@ -17,6 +17,9 @@ export interface Person {
   household: string | null;
   /** Sees every household, analytics, uploads, settings. */
   is_admin: boolean;
+  /** What to call this person on /preview, where strangers look. A role, not
+   *  a name — their own view keeps display_name. */
+  demo_label: string | null;
 }
 
 export interface Report {
@@ -334,6 +337,22 @@ export async function uploadReport(
     .single();
   if (error) throw new Error(error.message);
   return data as ReportUpload;
+}
+
+/** Removes the file, then its ledger row. That order on purpose: if the
+ *  second step fails the row is still listed and the retry succeeds, whereas
+ *  the reverse would leave a file nobody can see or remove. */
+export async function deleteReport(path: string): Promise<void> {
+  const { error: storageError } = await supabase.storage
+    .from("reports")
+    .remove([path]);
+  if (storageError) throw new Error(storageError.message);
+
+  const { error } = await supabase
+    .from("report_uploads")
+    .delete()
+    .eq("path", path);
+  if (error) throw new Error(error.message);
 }
 
 export function getMyUploads(): Promise<ReportUpload[]> {

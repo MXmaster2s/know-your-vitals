@@ -88,7 +88,15 @@ export function PersonProvider({
       personId,
       setPersonId,
       people,
-      labelFor: (id) => (id ? (byId.get(id)?.display_name ?? id) : ""),
+      // On the demo roster people are named by role, so a stranger reading
+      // someone else's blood work never learns whose it is. This one line
+      // covers every heading, chart legend and copied block at once.
+      labelFor: (id) => {
+        if (!id) return "";
+        const p = byId.get(id);
+        if (!p) return id;
+        return (roster === "demo" ? p.demo_label : null) ?? p.display_name ?? id;
+      },
       canEdit: (id) => {
         if (!editing || id === null || meId === null) return false;
         // The demo household is someone else's; it is never editable here.
