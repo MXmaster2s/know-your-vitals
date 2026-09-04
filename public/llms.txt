@@ -1,0 +1,14 @@
+# Health
+
+A private dashboard for your own lab results and nutrition plan, at
+health.openhouse.ink. Most of the site is behind sign-in and holds personal
+health records; there is nothing here to crawl.
+
+If you are an AI connected to this account's MCP server, read the standing
+brief before interpreting anything:
+
+- [MCP guidelines](https://health.openhouse.ink/mcp-guidelines.md): the rules
+  (R1–R10), how the data is shaped, and what the server does not contain.
+- [What it is](https://health.openhouse.ink/learnmore): the public description.
+- [Connect your AI](https://health.openhouse.ink/chatgpt): setup steps for
+  ChatGPT and Claude. Behind sign-in.

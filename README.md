@@ -148,6 +148,27 @@ Four tools — `overview`, `marker`, `nutrition`, `reports`. The signed-in page
 at `/chatgpt` mints and revokes addresses and carries the setup steps for both
 apps.
 
+### Telling the AI how to read the data
+
+`public/mcp-guidelines.md` is the standing brief for any connected AI: ten
+numbered rules, how the data is shaped, and what the server does *not* contain.
+It has one copy, served three ways, so no client misses it and nothing drifts:
+
+| Where | What it carries |
+|---|---|
+| `instructions` on `initialize` | The rules section — the binding part, ~850 tokens |
+| Resource `health://guidelines` | The whole document, on demand |
+| `/mcp-guidelines.md` | The same file, readable by a person |
+
+The Function reads it through the Pages `ASSETS` binding and caches it per
+isolate, so adding a rule is an edit to one Markdown file and a redeploy — no
+code change. `/llms.txt` points at it, and `robots.txt` allows those two paths
+while disallowing everything else.
+
+The rule that prompted it is **R1**: an AI may record facts, never commentary.
+A note written into a data row is indistinguishable from the owner's own words,
+so it reads as authoritative and contradicts the field beside it.
+
 ## Who may edit what
 
 With more than one person in the vault, read is shared and writes are not: by

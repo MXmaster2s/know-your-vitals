@@ -175,8 +175,19 @@ export function Guide({ addresses }: { addresses: React.ReactNode }) {
         <p className="text-sm leading-relaxed text-muted-foreground">
           Read-only, and only this household — never the demo household or
           anyone else&apos;s. The AI cannot add, change or delete anything.
-          It is told to report what the numbers did and to leave diagnosis to
-          a doctor.
+        </p>
+        <p className="text-sm leading-relaxed text-muted-foreground">
+          Every connected AI is handed a standing brief when it connects: ten
+          numbered rules covering how to read a lab range, what the data does
+          not contain, and the instruction to report what the numbers did
+          rather than diagnose. Read it at{" "}
+          <a
+            href="/mcp-guidelines.md"
+            className="underline decoration-border underline-offset-4 hover:decoration-foreground"
+          >
+            /mcp-guidelines.md
+          </a>
+          .
         </p>
       </section>
 

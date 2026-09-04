@@ -1,3 +1,7 @@
 # Private health records. Nothing here is meant to be indexed.
 User-agent: *
 Disallow: /
+
+# Except the two files written to be read by an AI.
+Allow: /llms.txt
+Allow: /mcp-guidelines.md

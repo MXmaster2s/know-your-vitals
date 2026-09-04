@@ -17,6 +17,9 @@
 interface Env {
   SUPABASE_URL: string;
   SUPABASE_SERVICE_KEY: string;
+  /** Pages binds the static site here, so the guidelines document has exactly
+   *  one copy: public/mcp-guidelines.md, edited without touching this file. */
+  ASSETS?: { fetch: (req: Request | string) => Promise<Response> };
 }
 
 interface RpcRequest {
@@ -36,12 +39,40 @@ const PROTOCOLS = ["2025-06-18", "2025-03-26", "2024-11-05"];
 
 const SERVER = { name: "health", version: "1.0.0" };
 
-const INSTRUCTIONS =
+const GUIDELINES_PATH = "/mcp-guidelines.md";
+const GUIDELINES_URI = "health://guidelines";
+
+/** Enough to work from if the document cannot be fetched. Deliberately not the
+ *  whole brief — a second copy would drift. */
+const FALLBACK =
   "Read-only access to one household's lab results and nutrition plan. Call " +
-  "overview first. Report what the numbers did: the value, the direction " +
-  "since the previous reading, and where it sits against the range the lab " +
-  "printed. Do not diagnose or prescribe; when something is outside its " +
-  "range, suggest the question to put to a doctor.";
+  "overview first. Report what the numbers did and leave diagnosis to a " +
+  "doctor. Judge every reading against the range printed beside it, not a " +
+  "textbook range. Nutrition is a plan, not a log. A missing value means not " +
+  "measured, never zero. Full brief: https://health.openhouse.ink" +
+  GUIDELINES_PATH;
+
+/** The document, cached for the life of the isolate. */
+let guidelines: string | null = null;
+
+async function brief(env: Env, request: Request): Promise<string> {
+  if (guidelines !== null) return guidelines;
+  try {
+    const url = new URL(GUIDELINES_PATH, request.url).toString();
+    const r = env.ASSETS ? await env.ASSETS.fetch(url) : await fetch(url);
+    guidelines = r.ok ? await r.text() : FALLBACK;
+  } catch {
+    guidelines = FALLBACK;
+  }
+  return guidelines;
+}
+
+/** What goes in `initialize`. The rules are the binding part and must reach
+ *  every client; the rest of the brief is one resources/read away. */
+function rules(doc: string): string {
+  const cut = doc.indexOf("\n## How the data is shaped");
+  return (cut === -1 ? doc : doc.slice(0, cut)).trim();
+}
 
 const TOOLS = [
   {
@@ -118,7 +149,7 @@ export const onRequest = async (ctx: {
   const messages = Array.isArray(body) ? body : [body];
   const replies: RpcResponse[] = [];
   for (const msg of messages) {
-    const reply = await handle(msg as RpcRequest, hash, env);
+    const reply = await handle(msg as RpcRequest, hash, env, request);
     if (reply === "unauthorized") return json({ error: "invalid token" }, 401);
     if (reply) replies.push(reply);
   }
@@ -130,7 +161,8 @@ export const onRequest = async (ctx: {
 async function handle(
   msg: RpcRequest,
   hash: string,
-  env: Env
+  env: Env,
+  request: Request
 ): Promise<RpcResponse | "unauthorized" | null> {
   if (!msg || typeof msg !== "object" || typeof msg.method !== "string") {
     return rpcError(null, -32600, "Invalid request");
@@ -148,9 +180,12 @@ async function handle(
         const asked = String(msg.params?.protocolVersion ?? "");
         return ok(id, {
           protocolVersion: PROTOCOLS.includes(asked) ? asked : PROTOCOLS[0],
-          capabilities: { tools: { listChanged: false } },
+          capabilities: {
+            tools: { listChanged: false },
+            resources: { listChanged: false, subscribe: false },
+          },
           serverInfo: SERVER,
-          instructions: INSTRUCTIONS,
+          instructions: rules(await brief(env, request)),
         });
       }
       case "ping":
@@ -158,7 +193,32 @@ async function handle(
       case "tools/list":
         return ok(id, { tools: TOOLS });
       case "resources/list":
-        return ok(id, { resources: [] });
+        return ok(id, {
+          resources: [
+            {
+              uri: GUIDELINES_URI,
+              name: "Guidelines for the AI reading these records",
+              description:
+                "The standing brief: the numbered rules (R1-R10), how the " +
+                "data is shaped, and what this server does not contain.",
+              mimeType: "text/markdown",
+            },
+          ],
+        });
+      case "resources/read": {
+        if (String(msg.params?.uri ?? "") !== GUIDELINES_URI) {
+          return rpcError(id, -32602, `Unknown resource: ${msg.params?.uri}`);
+        }
+        return ok(id, {
+          contents: [
+            {
+              uri: GUIDELINES_URI,
+              mimeType: "text/markdown",
+              text: await brief(env, request),
+            },
+          ],
+        });
+      }
       case "prompts/list":
         return ok(id, { prompts: [] });
       case "tools/call": {
