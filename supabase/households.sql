@@ -200,8 +200,12 @@ create table if not exists public.report_uploads (
   path        text not null unique,
   file_name   text not null,
   size_bytes  bigint,
-  uploaded_at timestamptz not null default now()
+  uploaded_at timestamptz not null default now(),
+  -- Stamped once someone has read the PDF. Three states come out of this plus
+  -- readers.paid_at: not paid, paid and waiting, done.
+  analysed_at timestamptz
 );
+alter table public.report_uploads add column if not exists analysed_at timestamptz;
 create index if not exists report_uploads_uid_idx on public.report_uploads (uid, uploaded_at desc);
 alter table public.report_uploads enable row level security;
 drop policy if exists insert_own on public.report_uploads;
@@ -219,12 +223,41 @@ create policy delete_own on public.report_uploads for delete to authenticated
 revoke all on public.report_uploads from anon;
 grant select, insert, delete on public.report_uploads to authenticated;
 
-create or replace function public.all_uploads()
-  returns table (email text, path text, file_name text, size_bytes bigint, uploaded_at timestamptz)
+-- Widening a return signature needs a drop; `create or replace` refuses.
+drop function if exists public.all_uploads();
+create function public.all_uploads()
+  returns table (email text, path text, file_name text, size_bytes bigint,
+                 uploaded_at timestamptz, analysed_at timestamptz)
   language sql stable security definer set search_path = public as $$
-  select lower(u.email), u.path, u.file_name, u.size_bytes, u.uploaded_at
+  select lower(u.email), u.path, u.file_name, u.size_bytes, u.uploaded_at, u.analysed_at
     from public.report_uploads u where public.is_admin() order by u.uploaded_at desc
 $$;
+
+-- Whoever reads the PDFs marks them done. Admin-only, addressed by path.
+create or replace function public.set_analysed(p text, done boolean)
+  returns void language sql security definer set search_path = public as $$
+  update public.report_uploads
+     set analysed_at = case when done then coalesce(analysed_at, now()) else null end
+   where path = p and public.is_admin()
+$$;
+
+-- Nutrition is usable without paying, so a newcomer needs one target row to
+-- edit against or the cards are inert.
+create or replace function public.ensure_nutrition_target()
+  returns public.nutrition_targets
+  language plpgsql security definer set search_path = public as $$
+declare
+  me_id text := public.me();
+  r public.nutrition_targets;
+begin
+  if me_id is null then raise exception 'not signed in'; end if;
+  select * into r from public.nutrition_targets
+   where person_id = me_id order by is_active desc, sort limit 1;
+  if found then return r; end if;
+  insert into public.nutrition_targets (person_id, label, is_active, sort)
+  values (me_id, 'My targets', true, 1) returning * into r;
+  return r;
+end $$;
 
 -- analytics gates move from is_owner() to is_admin(). visitor_log() also
 -- gains a paid_at column, and Postgres will not let `create or replace`

@@ -34,6 +34,7 @@ export default function AnalyticsPage() {
   } | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [open, setOpen] = React.useState<Visitor | null>(null);
+  const [tick, setTick] = React.useState(0);
 
   React.useEffect(() => {
     let cancelled = false;
@@ -47,7 +48,7 @@ export default function AnalyticsPage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [tick]);
 
   if (!allowed) {
     return (
@@ -163,6 +164,7 @@ export default function AnalyticsPage() {
         visits={data.visits}
         uploads={data.uploads}
         onClose={() => setOpen(null)}
+        onChanged={() => setTick((t) => t + 1)}
       />
     </div>
   );

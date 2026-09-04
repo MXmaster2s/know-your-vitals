@@ -37,6 +37,13 @@ export function AppFooter() {
             figure is quoted anywhere in the app — the checkout shows the
             right one. */}
         <Link
+          href="/chatgpt"
+          className="text-xs text-muted-foreground underline decoration-border underline-offset-4 transition-colors hover:text-foreground hover:decoration-foreground"
+        >
+          Connect your AI
+        </Link>
+
+        <Link
           href="/preview"
           className="text-xs text-muted-foreground underline decoration-border underline-offset-4 transition-colors hover:text-foreground hover:decoration-foreground"
         >

@@ -36,10 +36,17 @@ export interface Upload {
   file_name: string;
   size_bytes: number | null;
   uploaded_at: string;
+  analysed_at: string | null;
 }
 
 export const getVisitors = () => rpc<Visitor>("visitor_log");
 export const getUploads = () => rpc<Upload>("all_uploads");
+
+/** Marks one report read, or puts it back. Admin-only in the database. */
+export async function setAnalysed(path: string, done: boolean): Promise<void> {
+  const { error } = await supabase.rpc("set_analysed", { p: path, done });
+  if (error) throw new Error(error.message);
+}
 export const getVisitTimes = () => rpc<VisitTime>("visit_times");
 export const getPageTotals = () => rpc<PageTotal>("page_totals");
 

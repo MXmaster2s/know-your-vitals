@@ -16,6 +16,7 @@ import { useSession } from "@/components/auth-provider";
 import {
   REPORT_MAX_BYTES,
   deleteReport,
+  getMyStatus,
   getMyUploads,
   getSlots,
   uploadReport,
@@ -52,12 +53,18 @@ function vet(list: File[]): { ok: File[]; bad: Rejection[] } {
 export function UploadReports({
   title = "Find hidden trends in your blood tests",
   blurb,
+  variant = "hero",
 }: {
   title?: string;
   /** Replaces the default line under the title; the Preview demo link is
    *  part of the default and goes with it. */
   blurb?: React.ReactNode;
+  /** "hero" is the whole screen for someone with nothing yet. "section" is
+   *  the quieter version that sits at the foot of a page that already has
+   *  something on it, so more reports can be added at any time. */
+  variant?: "hero" | "section";
 }) {
+  const section = variant === "section";
   const { session } = useSession();
   const [queued, setQueued] = React.useState<File[]>([]);
   const [rejected, setRejected] = React.useState<Rejection[] | null>(null);
@@ -68,10 +75,12 @@ export function UploadReports({
   const [slots, setSlots] = React.useState<Slots | null>(null);
   const [mine, setMine] = React.useState<ReportUpload[] | null>(null);
   const [removing, setRemoving] = React.useState<string | null>(null);
+  const [paid, setPaid] = React.useState(false);
 
   React.useEffect(() => {
     getSlots().then(setSlots).catch(() => {});
     getMyUploads().then(setMine).catch(() => setMine([]));
+    getMyStatus().then((s) => setPaid(s.paid)).catch(() => {});
   }, []);
 
   const add = (list: FileList | null) => {
@@ -111,11 +120,28 @@ export function UploadReports({
   };
 
   return (
-    <div className="mx-auto flex w-full max-w-xl flex-col items-center gap-6 py-12 text-center sm:py-20">
+    <div
+      className={cn(
+        "flex w-full flex-col gap-6",
+        section
+          ? "items-stretch border-t pt-8 text-left"
+          : "mx-auto max-w-xl items-center py-12 text-center sm:py-20"
+      )}
+    >
       <div className="space-y-2">
-        <h1 className="font-serif text-2xl leading-tight sm:text-3xl">{title}</h1>
-        <p className="text-sm text-muted-foreground">
-          {blurb ?? (
+        <h1
+          className={cn(
+            "font-serif leading-tight",
+            section ? "text-lg" : "text-2xl sm:text-3xl"
+          )}
+        >
+          {section ? "Add more reports" : title}
+        </h1>
+        <p className={cn("text-muted-foreground", section ? "text-xs" : "text-sm")}>
+          {blurb ??
+            (section ? (
+              "Every report you add makes the trends longer and more useful."
+            ) : (
             <>
               Analyse your past blood reports to make your personalised health
               dashboard.{" "}
@@ -127,7 +153,7 @@ export function UploadReports({
               </Link>{" "}
               to see how it will look.
             </>
-          )}
+            ))}
         </p>
       </div>
 
@@ -143,7 +169,8 @@ export function UploadReports({
           add(e.dataTransfer.files);
         }}
         className={cn(
-          "flex w-full cursor-pointer flex-col items-center gap-3 rounded-2xl border border-dashed px-6 py-14 transition-colors",
+          "flex w-full cursor-pointer flex-col items-center gap-3 rounded-2xl border border-dashed px-6 transition-colors",
+          section ? "py-8" : "py-14",
           over
             ? "border-foreground bg-muted/60"
             : "border-border bg-card/40 hover:border-ring/60 hover:bg-card/70"
@@ -209,6 +236,7 @@ export function UploadReports({
       {mine && mine.length > 0 ? (
         <MyReports
           uploads={mine}
+          paid={paid}
           removing={removing}
           onDelete={async (u) => {
             setRemoving(u.path);
@@ -226,11 +254,13 @@ export function UploadReports({
         />
       ) : null}
 
-      {slots ? <SlotsLeft slots={slots} /> : null}
+      {slots && !section ? <SlotsLeft slots={slots} /> : null}
 
-      <Button asChild variant="outline" className="cursor-pointer">
-        <Link href="/learnmore">Learn more</Link>
-      </Button>
+      {!section ? (
+        <Button asChild variant="outline" className="cursor-pointer">
+          <Link href="/learnmore">Learn more</Link>
+        </Button>
+      ) : null}
 
       {/* Turned away — say exactly why, and which ones. */}
       {rejected ? (
@@ -304,10 +334,13 @@ export function UploadReports({
  */
 export function MyReports({
   uploads,
+  paid,
   removing,
   onDelete,
 }: {
   uploads: ReportUpload[];
+  /** Whether this account has paid — decides between the first two states. */
+  paid: boolean;
   removing: string | null;
   onDelete: (u: ReportUpload) => void;
 }) {
@@ -320,16 +353,19 @@ export function MyReports({
         {uploads.map((u) => (
           <li key={u.path} className="flex items-center gap-3 px-3 py-2.5">
             <FileText className="size-4 shrink-0 text-muted-foreground" strokeWidth={1.5} aria-hidden />
-            <span className="min-w-0 flex-1 truncate text-sm">{u.file_name}</span>
-            <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">
-              {new Date(u.uploaded_at).toLocaleDateString("en-GB", {
-                day: "numeric",
-                month: "short",
-              })}
-              {u.size_bytes
-                ? ` · ${(u.size_bytes / 1024).toLocaleString("en-IN", { maximumFractionDigits: 0 })} KB`
-                : ""}
+            <span className="min-w-0 flex-1 truncate text-sm">
+              {u.file_name}
+              <span className="block text-[11px] tabular-nums text-muted-foreground">
+                {new Date(u.uploaded_at).toLocaleDateString("en-GB", {
+                  day: "numeric",
+                  month: "short",
+                })}
+                {u.size_bytes
+                  ? ` · ${(u.size_bytes / 1024).toLocaleString("en-IN", { maximumFractionDigits: 0 })} KB`
+                  : ""}
+              </span>
             </span>
+            <StatusPill upload={u} paid={paid} />
             <button
               type="button"
               disabled={removing === u.path}
@@ -347,6 +383,45 @@ export function MyReports({
         Deleting a report removes the file from the server as well.
       </p>
     </section>
+  );
+}
+
+/**
+ * Where one report has got to. Only three things can be true of it, and the
+ * first one is a way out rather than a label: nothing happens to a report
+ * until there is access, so that state is the button that gets it.
+ */
+function StatusPill({ upload, paid }: { upload: ReportUpload; paid: boolean }) {
+  const base =
+    "shrink-0 rounded-full border px-2 py-0.5 text-[10px] uppercase tracking-wider";
+
+  if (upload.analysed_at) {
+    return (
+      <span className={cn(base, "border-positive/40 bg-positive/10 text-positive")}>
+        Analysed
+      </span>
+    );
+  }
+  if (paid) {
+    return (
+      <span className={cn(base, "text-muted-foreground")}>Paid · analysing</span>
+    );
+  }
+  if (!CHECKOUT_URL) {
+    return <span className={cn(base, "text-muted-foreground")}>Not analysed</span>;
+  }
+  return (
+    <a
+      href={CHECKOUT_URL}
+      target="_blank"
+      rel="noopener noreferrer"
+      className={cn(
+        base,
+        "border-foreground/30 transition-colors hover:border-foreground hover:bg-muted"
+      )}
+    >
+      Get analysed
+    </a>
   );
 }
 

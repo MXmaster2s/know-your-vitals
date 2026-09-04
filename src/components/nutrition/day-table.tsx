@@ -1,7 +1,10 @@
 "use client";
 
 import * as React from "react";
+import { Plus } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { EditText, EditWrapText } from "@/components/nutrition/edit-cell";
+import { createMeal } from "@/lib/data";
 import { usePerson } from "@/components/person-provider";
 import { cn } from "@/lib/utils";
 import {
@@ -58,9 +61,16 @@ export function DayTable({
 
   if (meals.length === 0) {
     return (
-      <p className="rounded-xl border border-dashed bg-card/50 px-4 py-10 text-center text-sm text-muted-foreground">
-        No meals yet.
-      </p>
+      <div className="space-y-3">
+        <p className="rounded-xl border border-dashed bg-card/50 px-4 py-8 text-center text-sm text-muted-foreground">
+          {editable
+            ? "Nothing here yet. Add the first thing you eat in a day and work forward."
+            : "No meals yet."}
+        </p>
+        {editable && personId ? (
+          <AddMeal personId={personId} nextSort={1} onAdded={onChanged} />
+        ) : null}
+      </div>
     );
   }
 
@@ -212,6 +222,94 @@ export function DayTable({
           })}
         </tbody>
       </table>
+      {editable && personId ? (
+        <div className="border-t px-3 py-2">
+          <AddMeal
+            personId={personId}
+            nextSort={meals.length + 1}
+            onAdded={onChanged}
+          />
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+/**
+ * A meal is the container everything else hangs off, so without this a person
+ * with an empty day has nothing to do. Time is optional — plenty of people
+ * know they eat breakfast before they know when.
+ */
+function AddMeal({
+  personId,
+  nextSort,
+  onAdded,
+}: {
+  personId: string;
+  nextSort: number;
+  onAdded: () => void;
+}) {
+  const [name, setName] = React.useState("");
+  const [time, setTime] = React.useState("");
+  const [busy, setBusy] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
+
+  async function submit() {
+    const clean = tidyLabel(name);
+    if (!clean) return;
+    const at = time.trim() ? parseClock(time) : null;
+    if (time.trim() && !at) {
+      setError("Times look like 9:30am or 19:30.");
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      await createMeal({ person_id: personId, name: clean, at_time: at, sort: nextSort });
+      setName("");
+      setTime("");
+      onAdded();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="space-y-1">
+      <div className="flex flex-wrap items-center gap-2">
+        <input
+          value={time}
+          onChange={(e) => setTime(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && submit()}
+          placeholder="9:30am"
+          aria-label="Time"
+          className="w-20 rounded-md border bg-background px-2 py-1 text-xs tabular-nums"
+        />
+        <input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && submit()}
+          placeholder="Breakfast, lunch, tea…"
+          aria-label="Meal name"
+          className="min-w-32 flex-1 rounded-md border bg-background px-2 py-1 text-xs"
+        />
+        <Button
+          size="sm"
+          variant="outline"
+          className="h-8 cursor-pointer"
+          disabled={!name.trim() || busy}
+          onClick={submit}
+        >
+          <Plus className="size-3.5" aria-hidden /> Add meal
+        </Button>
+      </div>
+      {error ? (
+        <p role="alert" className="text-[11px] text-destructive">
+          {error}
+        </p>
+      ) : null}
     </div>
   );
 }

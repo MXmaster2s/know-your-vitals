@@ -9,12 +9,23 @@ import { ModuleHeading } from "@/components/nutrition/module-heading";
 import { Skeleton } from "@/components/ui/skeleton";
 import { usePerson } from "@/components/person-provider";
 import { useNutritionData } from "@/lib/use-nutrition-data";
+import { ensureNutritionTarget } from "@/lib/data";
 import { mealTotals, sumTotals, type Meal } from "@/lib/nutrition";
 
 export default function NutritionPage() {
-  const { personId, labelFor } = usePerson();
+  const { personId, labelFor, roster, meId } = usePerson();
   const { data, error, refresh } = useNutritionData();
   const [openMeal, setOpenMeal] = React.useState<Meal | null>(null);
+
+  // Nutrition is usable without a dashboard and without paying, so a newcomer
+  // needs one target row to edit against — the cards are otherwise inert.
+  React.useEffect(() => {
+    if (roster !== "mine" || !meId) return;
+    ensureNutritionTarget()
+      .then(() => refresh())
+      .catch(() => {});
+    // once per person; refresh identity is stable enough here
+  }, [meId, roster]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const foodById = React.useMemo(
     () => new Map((data?.foods ?? []).map((f) => [f.id, f])),
@@ -30,9 +41,6 @@ export default function NutritionPage() {
   }
 
   if (!data || !personId) return <NutritionSkeleton />;
-
-  // Nothing to plan around yet — the reports come first.
-  if (data.meals.length === 0) return <UploadReports />;
 
   const target =
     data.targets.find((t) => t.is_active) ?? data.targets[0] ?? null;
@@ -76,6 +84,10 @@ export default function NutritionPage() {
           onChanged={refresh}
         />
       </section>
+
+      {/* Nutrition works without a dashboard and without paying, so the
+          reports live at the foot here too rather than blocking the page. */}
+      {roster === "mine" ? <UploadReports variant="section" /> : null}
 
       <MealDialog
         meal={liveMeal}

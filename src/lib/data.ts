@@ -306,6 +306,8 @@ export interface ReportUpload {
   file_name: string;
   size_bytes: number | null;
   uploaded_at: string;
+  /** Stamped once someone has read the PDF and the readings are in. */
+  analysed_at: string | null;
 }
 
 export const REPORT_MAX_BYTES = 5 * 1024 * 1024;
@@ -355,6 +357,14 @@ export async function deleteReport(path: string): Promise<void> {
   if (error) throw new Error(error.message);
 }
 
+/** Whether the signed-in account has paid. Says nothing about anyone else. */
+export async function getMyStatus(): Promise<{ paid: boolean }> {
+  const { data, error } = await supabase.rpc("my_status");
+  if (error) throw new Error(error.message);
+  const row = Array.isArray(data) ? data[0] : data;
+  return { paid: row?.paid === true };
+}
+
 export function getMyUploads(): Promise<ReportUpload[]> {
   return unwrap<ReportUpload>(
     supabase.from("report_uploads").select("*").order("uploaded_at", { ascending: false })
@@ -369,4 +379,25 @@ export async function signedReportUrl(path: string): Promise<string> {
     .createSignedUrl(path, 60 * 60);
   if (error) throw new Error(error.message);
   return data.signedUrl;
+}
+
+// ---- Nutrition bootstrap -------------------------------------------------
+
+/** Nutrition is usable without paying, so a newcomer needs a target row to
+ *  edit against. Creates one blank active target for your own person, once. */
+export async function ensureNutritionTarget(): Promise<void> {
+  const { error } = await supabase.rpc("ensure_nutrition_target");
+  if (error) throw new Error(error.message);
+}
+
+/** A meal is the container everything else in Nutrition hangs off, so a
+ *  person with none has nothing to do. RLS scopes the insert to yourself. */
+export async function createMeal(input: {
+  person_id: string;
+  name: string;
+  at_time: string | null;
+  sort: number;
+}): Promise<void> {
+  const { error } = await supabase.from("meals").insert(input);
+  if (error) throw new Error(error.message);
 }

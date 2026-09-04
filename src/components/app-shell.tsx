@@ -15,7 +15,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   // Public: the landing page, and where a payment lands you. Everything else
   // is behind sign-in.
-  const PUBLIC = ["/login", "/learnmore", "/paid"];
+  const PUBLIC = ["/login", "/learnmore", "/paid", "/chatgpt"];
   if (PUBLIC.includes(pathname)) return <>{children}</>;
   return (
     <AuthGuard>

@@ -10,7 +10,7 @@ import {
 import * as React from "react";
 import { Download } from "lucide-react";
 import { signedReportUrl } from "@/lib/data";
-import { ago, shortDate, stamp, type Upload, type VisitTime, type Visitor } from "@/lib/analytics";
+import { ago, setAnalysed, shortDate, stamp, type Upload, type VisitTime, type Visitor } from "@/lib/analytics";
 
 /**
  * Guest analytics — everything known about one person, which is deliberately
@@ -23,11 +23,14 @@ export function GuestDialog({
   visits,
   uploads,
   onClose,
+  onChanged,
 }: {
   guest: Visitor | null;
   visits: VisitTime[];
   uploads: Upload[];
   onClose: () => void;
+  /** Refetch after marking a report read, so the pill updates. */
+  onChanged: () => void;
 }) {
   if (!guest) return null;
 
@@ -113,6 +116,11 @@ export function GuestDialog({
                       ? ` · ${(f.size_bytes / 1024).toLocaleString("en-IN", { maximumFractionDigits: 0 })} KB`
                       : ""}
                   </span>
+                  <AnalysedToggle
+                    path={f.path}
+                    done={f.analysed_at !== null}
+                    onChanged={onChanged}
+                  />
                   <DownloadLink path={f.path} name={f.file_name} />
                 </li>
               ))}
@@ -171,6 +179,47 @@ function DownloadLink({ path, name }: { path: string; name: string }) {
       className="grid size-7 shrink-0 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
     >
       <Download className="size-3.5" aria-hidden />
+    </button>
+  );
+}
+
+/**
+ * Marks one report read. This is what turns a guest's pill from "analysing"
+ * to "Analysed", so it lives next to the file rather than somewhere abstract.
+ */
+function AnalysedToggle({
+  path,
+  done,
+  onChanged,
+}: {
+  path: string;
+  done: boolean;
+  onChanged: () => void;
+}) {
+  const [busy, setBusy] = React.useState(false);
+  return (
+    <button
+      type="button"
+      disabled={busy}
+      title={done ? "Mark as not analysed" : "Mark as analysed"}
+      aria-pressed={done}
+      onClick={async () => {
+        setBusy(true);
+        try {
+          await setAnalysed(path, !done);
+          onChanged();
+        } finally {
+          setBusy(false);
+        }
+      }}
+      className={
+        "shrink-0 rounded-full border px-2 py-0.5 text-[10px] uppercase tracking-wider transition-colors disabled:opacity-50 " +
+        (done
+          ? "border-positive/40 bg-positive/10 text-positive"
+          : "text-muted-foreground hover:border-ring/60 hover:text-foreground")
+      }
+    >
+      {done ? "Analysed" : "Mark analysed"}
     </button>
   );
 }
