@@ -74,10 +74,19 @@ export function MarkerDetailDialog({
     setCompare(false);
   }
 
+  const { people, labelFor } = usePerson();
+  // A stable dependency: the effect must re-run when the roster changes, and
+  // an array identity would re-run it on every render.
+  const rosterIds = React.useMemo(
+    () => people.map((p) => p.id).sort().join(","),
+    [people]
+  );
+
   React.useEffect(() => {
-    if (!markerId) return;
+    if (!markerId || !rosterIds) return;
+    const ids = rosterIds.split(",");
     let cancelled = false;
-    Promise.all([getMeasurementsForMarker(markerId), getAllReports()])
+    Promise.all([getMeasurementsForMarker(markerId, ids), getAllReports(ids)])
       .then(([measurements, reports]) => {
         if (cancelled) return;
         const labByReport = new Map<string, string>();
@@ -90,9 +99,8 @@ export function MarkerDetailDialog({
     return () => {
       cancelled = true;
     };
-  }, [markerId]);
+  }, [markerId, rosterIds]);
 
-  const { people, labelFor } = usePerson();
   // "the other person" = the next one in the roster. Comparison only makes
   // sense for a two-person vault; with more, it pairs with the next entry.
   const otherId = React.useMemo(() => {

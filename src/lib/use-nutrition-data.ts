@@ -29,12 +29,18 @@ export interface NutritionData {
 /** Everything the Nutrition tab needs. Meal items need the meal ids first, so
  *  this is two round-trips rather than one — the rest go in parallel. */
 export function useNutritionData() {
-  const { personId } = usePerson();
+  const { personId, people } = usePerson();
   const [data, setData] = React.useState<NutritionData | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [tick, setTick] = React.useState(0);
 
-  const requestKey = `${personId ?? ""}#${tick}`;
+  // The ingredient library belongs to a household, so the fetch has to key on
+  // it as well as the person.
+  const households = React.useMemo(
+    () => [...new Set(people.map((p) => p.household).filter((h): h is string => !!h))].sort(),
+    [people]
+  );
+  const requestKey = `${personId ?? ""}@${households.join(",")}#${tick}`;
   const [lastKey, setLastKey] = React.useState(requestKey);
   if (lastKey !== requestKey) {
     setLastKey(requestKey);
@@ -46,7 +52,7 @@ export function useNutritionData() {
     let cancelled = false;
     (async () => {
       const [foods, meals, targets, activity] = await Promise.all([
-        getFoods(),
+        getFoods(households),
         getMeals(personId),
         getNutritionTargets(personId),
         getActivityTargets(personId),

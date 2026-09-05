@@ -487,6 +487,13 @@ function AddIngredient({
   const [qty, setQty] = React.useState("100");
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+  // Which households' ingredients an existing name may match, so typing
+  // "Tomato" reuses this household's row and never another one's.
+  const { people } = usePerson();
+  const households = React.useMemo(
+    () => [...new Set(people.map((x) => x.household).filter((h): h is string => !!h))],
+    [people]
+  );
 
   async function submit() {
     const n = Number(qty);
@@ -494,7 +501,7 @@ function AddIngredient({
     setBusy(true);
     setError(null);
     try {
-      const foodId = await findOrCreateFood(name);
+      const foodId = await findOrCreateFood(name, households);
       await insertMealItem({
         meal_id: mealId,
         meal_food_id: mealFoodId,

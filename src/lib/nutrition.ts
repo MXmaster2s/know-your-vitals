@@ -113,9 +113,30 @@ async function unwrap<T>(query: PromiseLike<QueryResult<T[]>>): Promise<T[]> {
   return data ?? [];
 }
 
-export function getFoods(): Promise<Food[]> {
+/** PostgREST `in.(…)` list. Household names are slugs or auth ids, but quote
+ *  them anyway so a value can never end the list early. */
+function inList(values: string[]): string {
+  return `(${values.map((v) => JSON.stringify(v)).join(",")})`;
+}
+
+/** Which households' ingredients this screen may show: the ones on screen,
+ *  plus shared reference rows (`household is null`). Without the filter an
+ *  admin's picker fills up with every other household's foods. */
+function foodScope(households: string[]): string {
+  const named = households.filter(Boolean);
+  return named.length === 0
+    ? "household.is.null"
+    : `household.is.null,household.in.${inList(named)}`;
+}
+
+export function getFoods(households: string[]): Promise<Food[]> {
   return unwrap<Food>(
-    supabase.from("foods").select("*").order("sort").order("name")
+    supabase
+      .from("foods")
+      .select("*")
+      .or(foodScope(households))
+      .order("sort")
+      .order("name")
   );
 }
 
@@ -386,13 +407,17 @@ function slugify(name: string): string {
  * already has one by that name, otherwise creates a bare row — no nutrition,
  * no price — for the numbers to be filled in afterwards.
  */
-export async function findOrCreateFood(rawName: string): Promise<string> {
+export async function findOrCreateFood(
+  rawName: string,
+  households: string[]
+): Promise<string> {
   const name = tidyLabel(rawName);
   if (!name) throw new Error("Name required");
 
   const { data: found, error: findErr } = await supabase
     .from("foods")
     .select("id")
+    .or(foodScope(households))
     .ilike("name", name)
     .limit(1);
   if (findErr) throw new Error(findErr.message);

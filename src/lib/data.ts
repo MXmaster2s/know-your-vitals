@@ -147,23 +147,36 @@ export function getReports(personId: string): Promise<Report[]> {
   );
 }
 
-/** All measurements of one marker across BOTH people (comparison chart). */
+/** One marker across the people on screen (comparison chart).
+ *
+ *  Scoped by id rather than left to RLS: an admin's policies resolve to every
+ *  household, so "whatever RLS returns" is the roster for most people and the
+ *  entire database for one. The screen means these people, so it asks for
+ *  them. RLS stays the backstop it was. */
 export function getMeasurementsForMarker(
-  markerId: string
+  markerId: string,
+  personIds: string[]
 ): Promise<Measurement[]> {
+  if (personIds.length === 0) return Promise.resolve([]);
   return unwrap<Measurement>(
     supabase
       .from("measurements")
       .select("*")
       .eq("marker_id", markerId)
+      .in("person_id", personIds)
       .order("taken_on", { ascending: true })
   );
 }
 
-/** All reports for both people (lab names in the comparison tooltip). */
-export function getAllReports(): Promise<Report[]> {
+/** Reports for the people on screen (lab names in the comparison tooltip). */
+export function getAllReports(personIds: string[]): Promise<Report[]> {
+  if (personIds.length === 0) return Promise.resolve([]);
   return unwrap<Report>(
-    supabase.from("reports").select("*").order("taken_on", { ascending: true })
+    supabase
+      .from("reports")
+      .select("*")
+      .in("person_id", personIds)
+      .order("taken_on", { ascending: true })
   );
 }
 
@@ -365,9 +378,23 @@ export async function getMyStatus(): Promise<{ paid: boolean }> {
   return { paid: row?.paid === true };
 }
 
-export function getMyUploads(): Promise<ReportUpload[]> {
+/** The signed-in account's OWN uploads, and only those.
+ *
+ *  The uid filter is the point. The select policy is `uid = auth.uid() OR
+ *  is_admin()`, which is right for the table — the Analytics download needs
+ *  it — but it means an unfiltered read hands an admin everybody's files under
+ *  a heading that says "your reports". Resolved here rather than passed in, so
+ *  no caller can leave it out. */
+export async function getMyUploads(): Promise<ReportUpload[]> {
+  const { data: auth } = await supabase.auth.getSession();
+  const uid = auth.session?.user?.id;
+  if (!uid) return [];
   return unwrap<ReportUpload>(
-    supabase.from("report_uploads").select("*").order("uploaded_at", { ascending: false })
+    supabase
+      .from("report_uploads")
+      .select("*")
+      .eq("uid", uid)
+      .order("uploaded_at", { ascending: false })
   );
 }
 

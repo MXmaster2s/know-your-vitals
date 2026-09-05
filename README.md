@@ -260,6 +260,26 @@ is:
   `.env.local`. The MCP function uses it server-side, as a Pages secret that
   never reaches a browser.
 
+### RLS is the floor, not the filter
+
+A policy answers "may this person touch this row at all". It is not the same
+question as "what does this screen mean", and on this schema the two come apart
+for exactly one person: every `is_admin()` clause widens an admin's policies to
+the whole database. So a query that names no scope returns the roster for most
+people and everything for an admin.
+
+`report_uploads` is the worked example. Its select policy is
+`uid = auth.uid() OR is_admin()` — correct for the table, because the Analytics
+download needs to reach a guest's file — but an unfiltered read put another
+account's upload under a heading reading "your reports". The fix is not to
+narrow the policy; it is for the query to say what it means:
+`getMyUploads()` resolves the session and filters on `uid`, and the
+person-scoped reads (`getAllReports`, `getMeasurementsForMarker`, `getFoods`)
+take the ids or households they are for.
+
+**So: never let "whatever RLS returns" stand in for a scope.** Pass the ids.
+The policy then catches the mistake you did not make, which is its job.
+
 ### Readers, owners and viewers
 
 Three levels, and the difference between the last two is whether you have a row
