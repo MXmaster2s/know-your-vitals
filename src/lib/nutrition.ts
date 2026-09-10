@@ -13,9 +13,16 @@ export interface Food {
   fiber_g: number | null;
   /** ₹ per kg as purchased. */
   price_per_kg: number | null;
-  /** Edible fraction of the purchased weight — 0.65 for bone-in chicken.
-   *  Drives the meal maths. Not what the Ingredients table shows. */
+  /** @deprecated Read by nothing since 2026-09-10. Kept because it is what
+   *  the per-kg figures were seeded from. `edible_g_per_kg` is the live one. */
   edible_yield: number;
+  /** Everything below is per kg AS PURCHASED — the weight that goes on the
+   *  scale, bone and shell included. One denominator for the whole table, so
+   *  "160 g of chicken" never has to mean two different things. */
+  kcal_per_kg: number | null;
+  carb_g_per_kg: number | null;
+  fat_g_per_kg: number | null;
+  fiber_g_per_kg: number | null;
   /** Protein in one kg AS PURCHASED — bone, shell and peel included, which is
    *  what makes cost ÷ protein an honest comparison between two things on a
    *  price board. Null until looked up; never zero. */
@@ -292,23 +299,36 @@ export const ZERO: Totals = {
 };
 
 /**
- * What one meal item contributes. `qty_g` is the weight that went on the
- * scale, so the edible yield applies to the nutrition — what survives the bone
- * and the shell. Cost does not derive from anything: it is the rupee figure
- * the owner entered for this item in this meal.
+ * What one serving contributes. `qty_g` is the weight that went on the scale
+ * and every figure on the food is per kg of exactly that weight, so this is a
+ * single multiplication with nothing hidden in it.
+ *
+ * Both nutrition and cost are derived. The ingredient is the one place either
+ * is stated, which is what stops the same fact being edited in two tables and
+ * disagreeing with itself.
  */
 export function itemTotals(item: MealItem, food: Food | undefined): Totals {
-  const cost = item.price ?? 0;
-  if (!food) return { ...ZERO, cost };
-  const per100 = (item.qty_g * food.edible_yield) / 100;
+  if (!food) return { ...ZERO };
+  const kg = item.qty_g / 1000;
   return {
-    kcal: (food.kcal ?? 0) * per100,
-    protein_g: (food.protein_g ?? 0) * per100,
-    carb_g: (food.carb_g ?? 0) * per100,
-    fat_g: (food.fat_g ?? 0) * per100,
-    fiber_g: (food.fiber_g ?? 0) * per100,
-    cost,
+    kcal: (food.kcal_per_kg ?? 0) * kg,
+    protein_g: (food.protein_g_per_kg ?? 0) * kg,
+    carb_g: (food.carb_g_per_kg ?? 0) * kg,
+    fat_g: (food.fat_g_per_kg ?? 0) * kg,
+    fiber_g: (food.fiber_g_per_kg ?? 0) * kg,
+    cost: (food.price_per_kg ?? 0) * kg,
   };
+}
+
+/** True when the ingredient has nutrition figures at all. A food added by name
+ *  has none yet, and counting it as zero would quietly under-report the day. */
+export function hasFigures(food: Food | undefined): boolean {
+  return !!food && food.kcal_per_kg !== null;
+}
+
+/** True when a rupee rate exists to derive a serving price from. */
+export function hasRate(food: Food | undefined): boolean {
+  return !!food && food.price_per_kg !== null;
 }
 
 /**
@@ -330,18 +350,6 @@ export function perGramProtein(food: Food): number | null {
 /** ₹1.26 rather than ₹1 — at this scale the paise are the comparison. */
 export const rupees2 = (n: number) =>
   `₹${n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-
-/** The per-kg rate, worked out backwards from what was actually paid. A
- *  comparison number only — the per-meal figure above is the real one. */
-export function pricePerKg(item: MealItem, food: Food | undefined): number | null {
-  if (item.price === null || item.price === undefined) return null;
-  const grams =
-    item.amount_unit === "g"
-      ? item.qty_g
-      : item.qty_g || (unitFactor(item.amount_unit, food) ?? 0);
-  if (!grams) return null;
-  return (item.price / grams) * 1000;
-}
 
 export function sumTotals(list: Totals[]): Totals {
   return list.reduce<Totals>(

@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { EditNum, EditText, EditWrapText } from "@/components/nutrition/edit-cell";
-import { LinkCell } from "@/components/nutrition/link-picker";
+import { IngredientDialog } from "@/components/nutrition/ingredient-dialog";
 import { UnitPicker } from "@/components/nutrition/unit-picker";
 import { usePerson } from "@/components/person-provider";
 import { cn } from "@/lib/utils";
@@ -21,6 +21,8 @@ import {
   displayAmount,
   findOrCreateFood,
   fmt0,
+  hasFigures,
+  hasRate,
   fmt1,
   fmtClock,
   gramsFromAmount,
@@ -33,7 +35,6 @@ import {
   summaryWith,
   summaryWithout,
   tidyLabel,
-  updateFood,
   updateMeal,
   updateMealFood,
   updateMealItem,
@@ -45,7 +46,7 @@ import {
 } from "@/lib/nutrition";
 
 const COLS =
-  "sm:grid-cols-[minmax(7rem,1.35fr)_3.5rem_4.25rem_minmax(7rem,1.35fr)_minmax(10rem,1.6fr)_2rem_3.75rem_1.5rem]";
+  "sm:grid-cols-[minmax(7rem,1.35fr)_3.5rem_4.25rem_minmax(7rem,1.3fr)_minmax(9rem,1.5fr)_4.75rem_1.5rem]";
 
 /**
  * Edit food — one meal, broken into the Foods it is actually made of. A Food
@@ -73,10 +74,14 @@ export function MealDialog({
 }) {
   const { personId, canEdit } = usePerson();
   const editable = canEdit(personId);
+  const [openFood, setOpenFood] = React.useState<string | null>(null);
   const foodById = React.useMemo(
     () => new Map(foods.map((f) => [f.id, f])),
     [foods]
   );
+  // Re-resolved every render so an edit inside the ingredient shows here the
+  // moment it saves.
+  const liveFood = openFood ? (foodById.get(openFood) ?? null) : null;
 
   if (!meal) return null;
 
@@ -118,6 +123,7 @@ export function MealDialog({
         <div className="space-y-3 px-3 pb-3 pt-3 sm:px-5 sm:pb-5">
           {boxes.map((box) => (
             <FoodBox
+              onOpenFood={setOpenFood}
               key={box.id}
               box={box}
               meal={meal}
@@ -146,6 +152,16 @@ export function MealDialog({
             </p>
           )}
         </div>
+        {liveFood ? (
+          <IngredientDialog
+            food={liveFood}
+            usedIn={items.filter((i) => i.food_id === liveFood.id).length}
+            editable={editable}
+            onChanged={onChanged}
+            onClose={() => setOpenFood(null)}
+          />
+        ) : null}
+
       </DialogContent>
     </Dialog>
   );
@@ -159,6 +175,7 @@ function FoodBox({
   foodById,
   editable,
   onChanged,
+  onOpenFood,
 }: {
   box: MealFood;
   meal: Meal;
@@ -166,6 +183,7 @@ function FoodBox({
   foodById: Map<string, Food>;
   editable: boolean;
   onChanged: () => void;
+  onOpenFood: (foodId: string) => void;
 }) {
   const rows = [...items].sort((a, b) => (a.sort ?? 0) - (b.sort ?? 0));
   const t = mealTotals(rows, foodById);
@@ -223,9 +241,8 @@ function FoodBox({
         <span>Amount</span>
         <span>Unit</span>
         <span>Comments</span>
-        <span>Nutrition</span>
-        <span />
-        <span className="text-right">Price</span>
+        <span>Nutrition / serving</span>
+        <span className="text-right">Price / serving</span>
         <span />
       </div>
 
@@ -237,6 +254,7 @@ function FoodBox({
         ) : (
           rows.map((it) => (
             <ItemRow
+              onOpenFood={onOpenFood}
               key={it.id}
               item={it}
               food={foodById.get(it.food_id)}
@@ -265,11 +283,15 @@ function ItemRow({
   food,
   editable,
   onChanged,
+  onOpenFood,
 }: {
   item: MealItem;
   food: Food | undefined;
   editable: boolean;
   onChanged: () => void;
+  /** A serving owns only how much was eaten. Everything about the thing
+   *  itself is edited in one place, which this opens. */
+  onOpenFood: (foodId: string) => void;
 }) {
   const [unitOpen, setUnitOpen] = React.useState(false);
   const line = itemTotals(item, food);
@@ -277,7 +299,7 @@ function ItemRow({
   const unitLabel = unitWord(item.amount_unit, amount);
   // A food added by name has no figures yet — say so rather than counting it
   // as zero and letting the day totals quietly under-report.
-  const missing = !food || food.kcal === null;
+  const missing = !hasFigures(food);
 
   const remove = editable ? (
     <button
@@ -293,37 +315,40 @@ function ItemRow({
     </button>
   ) : null;
 
+  // Anywhere that is not a field opens the ingredient. The two cells that ARE
+  // the serving — how much, and how it was made — swallow the click.
+  const stop = (e: React.MouseEvent) => e.stopPropagation();
+
   return (
     <li
+      role="button"
+      tabIndex={0}
+      aria-label={`Edit ${food?.name ?? item.food_id}`}
+      onClick={() => food && onOpenFood(food.id)}
+      onKeyDown={(e) => {
+        if (e.target !== e.currentTarget) return;
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          if (food) onOpenFood(food.id);
+        }
+      }}
       className={cn(
-        "grid grid-cols-1 gap-0.5 px-2 py-2.5 sm:items-start sm:gap-2 sm:px-3",
+        "grid cursor-pointer grid-cols-1 gap-0.5 px-2 py-2.5 transition-colors sm:items-start sm:gap-2 sm:px-3",
+        "hover:bg-muted/40 focus-visible:bg-muted/40 focus-visible:outline-none",
         COLS
       )}
     >
       <Cell label="Item">
         <span className="flex items-center gap-2">
-          <span className="min-w-0 flex-1">
-            {food ? (
-              <EditText
-                value={food.name}
-                className="text-sm"
-                disabled={!editable}
-                onSave={async (v) => {
-                  if (!v) return;
-                  await updateFood(food.id, { name: tidyLabel(v) });
-                  onChanged();
-                }}
-              />
-            ) : (
-              <span className="text-sm">{item.food_id}</span>
-            )}
+          <span className="min-w-0 flex-1 px-1.5 text-sm">
+            {food?.name ?? item.food_id}
           </span>
-          <span className="sm:hidden">{remove}</span>
+          <span onClick={stop} className="sm:hidden">{remove}</span>
         </span>
       </Cell>
 
       {/* Amount and its unit belong together — on a phone they share a line. */}
-      <div className="grid grid-cols-2 gap-2 sm:contents">
+      <div onClick={stop} className="grid grid-cols-2 gap-2 sm:contents">
         <Cell label="Amount">
           <EditNum
             value={amount}
@@ -362,7 +387,7 @@ function ItemRow({
         </Cell>
       </div>
 
-      <Cell label="Comments">
+      <Cell label="Comments" onClick={stop}>
         <EditWrapText
           value={item.comments}
           placeholder="—"
@@ -375,54 +400,47 @@ function ItemRow({
         />
       </Cell>
 
-      <Cell label="Nutrition">
-        <EditWrapText
-          value={food?.nutrients ?? null}
-          placeholder="Fetching data"
-          emptyHint="Data will update next time Rohit works on the site."
-          className="text-xs"
-          disabled={!editable || !food}
-          onSave={async (v) => {
-            if (!food) return;
-            await updateFood(food.id, { nutrients: v });
-            onChanged();
-          }}
-        />
-        {/* Calories sit under the line they belong to, the way the grams sit
-            under the unit. Nothing is shown while there are no figures —
-            "0 kcal" would read as a measurement rather than a gap. */}
-        {missing ? null : (
-          <span className="block px-1.5 text-[11px] tabular-nums text-muted-foreground">
-            {fmt0(line.kcal)} kcal
+      {/* Both derived from the amount and the ingredient's per-kilo figures.
+          Nothing here is typed: the serving states how much, the ingredient
+          states what a kilo of it is, and these two are the product. */}
+      <Cell label="Nutrition / serving">
+        {missing ? (
+          <span className="block px-1.5 text-xs italic text-muted-foreground/70">
+            No figures yet
+          </span>
+        ) : (
+          <>
+            <span className="block px-1.5 text-sm tabular-nums">
+              {fmt0(line.kcal)} kcal · {fmt1(line.protein_g)} g protein
+            </span>
+            <span className="block px-1.5 text-[11px] tabular-nums text-muted-foreground">
+              {fmt1(line.carb_g)} c · {fmt1(line.fat_g)} f · {fmt1(line.fiber_g)} fib
+            </span>
+          </>
+        )}
+        {food?.nutrients ? (
+          <span className="block px-1.5 text-[11px] text-muted-foreground">
+            {food.nutrients}
+          </span>
+        ) : null}
+      </Cell>
+
+      <Cell label="Price / serving" align="right">
+        {hasRate(food) ? (
+          <span className="block px-1.5 text-sm tabular-nums">
+            {rupees(line.cost)}
+          </span>
+        ) : (
+          <span
+            className="block px-1.5 text-xs italic text-muted-foreground/70"
+            title="This ingredient has no cost per kilo yet"
+          >
+            No rate
           </span>
         )}
       </Cell>
 
-      {/* Link and price are both narrow — on a phone they share a line too. */}
-      <div className="grid grid-cols-2 gap-2 sm:contents">
-      <Cell label="Link">
-        <LinkCell food={food} editable={editable} onChanged={onChanged} />
-      </Cell>
-
-      <Cell label="Price" align="right">
-        <span className="flex items-baseline gap-0.5 sm:justify-end">
-          <span className="text-xs text-muted-foreground">₹</span>
-          <EditNum
-            value={item.price}
-            width="w-11"
-            disabled={!editable}
-            onSave={async (n) => {
-              // What this item cost, as stated. Nothing is inferred from a
-              // per-kg rate — the rate is the softer number, not this one.
-              await updateMealItem(item.id, { price: n });
-              onChanged();
-            }}
-          />
-        </span>
-      </Cell>
-      </div>
-
-      <div className="hidden sm:block sm:pt-0.5">{remove}</div>
+      <div onClick={stop} className="hidden sm:block sm:pt-0.5">{remove}</div>
 
       {unitOpen ? (
         <UnitPicker
@@ -446,14 +464,17 @@ function unitWord(unit: AmountUnit, amount: number): string {
 function Cell({
   label,
   align,
+  onClick,
   children,
 }: {
   label: string;
   align?: "right";
+  onClick?: (e: React.MouseEvent) => void;
   children: React.ReactNode;
 }) {
   return (
     <div
+      onClick={onClick}
       className={cn(
         "flex items-baseline gap-2 sm:block",
         align === "right" && "sm:text-right"

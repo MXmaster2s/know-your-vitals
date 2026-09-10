@@ -41,11 +41,15 @@ consumed one.
 with `figures_known: false` has no nutrition data — it is unknown, not nought,
 and must not be summed as zero. A missing panel is a gap worth naming.
 
-**R6 — Respect the units.** Grams are as weighed, which may be bone-in or dry
-weight; nutrition is per 100 g of *edible* weight, and `edible_yield` bridges
-the two. `price_inr` is what that item cost in that meal, in rupees — a fact the
-owner entered, not a rate to be recomputed. A few foods carry a short note
-stating a measurement convention ("100 g dry ≈ 250 g sprouted"); honour it.
+**R6 — One denominator: per kilo as purchased.** Every figure on an ingredient
+— cost, calories, protein, carbohydrate, fat, fibre — is per kilo of the weight
+that goes on the scale, bone and shell included. A serving is that rate times
+its grams and nothing else: no yield adjustment, no second basis, and serving
+nutrition and price are always derived rather than stated. `edible_g_per_kg`
+sits alongside as an efficiency reading and is an input to nothing — applying
+it would charge for the waste twice, because the waste is already inside both
+sides. A few foods carry a short note stating a measurement convention
+("100 g dry ≈ 250 g sprouted"); honour it.
 
 **R7 — Say what is missing.** Gaps are findings. A marker not repeated, a panel
 never ordered, a planned visit not yet taken — surface these plainly rather than
@@ -104,7 +108,9 @@ Stating these saves you deriving them, and stops you assuming otherwise:
 
 ## Changelog
 
-- **2026-09-10** — R11 added: a recorded product link is the authority for
+- **2026-09-10** — R6 rewritten. Ingredient figures moved to a single
+  denominator, per kilo as purchased; `edible_yield` is no longer read by
+  anything and serving nutrition and price are derived. R11 added: a recorded product link is the authority for
   that food's figures, and an estimate must say it is one. New `ingredients`
   tool, carrying the pantry priced per kilo as purchased.
 - **2026-09-04** — First version. R1 added at the owner's instruction after

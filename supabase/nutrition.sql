@@ -180,3 +180,30 @@ end $$;
 -- apart so filling this in can never move a day's calories.
 alter table public.foods add column if not exists protein_g_per_kg numeric;
 alter table public.foods add column if not exists edible_g_per_kg  numeric;
+
+-- ------------------------------------------- one denominator: per kilo ----
+-- Nutrition moves to "per kg AS PURCHASED", the same basis as price_per_kg and
+-- protein_g_per_kg, and `edible_yield` stops being read by anything.
+--
+-- Why: two denominators in one table is a question you have to answer every
+-- time you read a row — is this 160 g of chicken the bone-in weight or the
+-- meat? Worse, `edible_yield` defaults to 1, so every food nobody has measured
+-- silently claimed zero waste and the maths quietly believed it. One basis,
+-- the weight you actually put on the scale, removes the question.
+--
+-- `edible_yield` is left in place but is now dead to the application; the
+-- user-facing efficiency figure is `edible_g_per_kg`.
+alter table public.foods add column if not exists kcal_per_kg    numeric;
+alter table public.foods add column if not exists carb_g_per_kg  numeric;
+alter table public.foods add column if not exists fat_g_per_kg   numeric;
+alter table public.foods add column if not exists fiber_g_per_kg numeric;
+
+-- Seed from the old basis so the migration is lossless: per 100 g edible x 10
+-- x the yield IS per kg as purchased, so every day total is unchanged on the
+-- day this runs. From here the per-kg figure is the one that gets edited.
+update public.foods set
+  kcal_per_kg    = coalesce(kcal_per_kg,    round((kcal      * 10 * edible_yield)::numeric, 1)),
+  carb_g_per_kg  = coalesce(carb_g_per_kg,  round((carb_g    * 10 * edible_yield)::numeric, 1)),
+  fat_g_per_kg   = coalesce(fat_g_per_kg,   round((fat_g     * 10 * edible_yield)::numeric, 1)),
+  fiber_g_per_kg = coalesce(fiber_g_per_kg, round((fiber_g   * 10 * edible_yield)::numeric, 1))
+ where kcal is not null;

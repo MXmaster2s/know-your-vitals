@@ -1,18 +1,14 @@
 "use client";
 
 import * as React from "react";
-import { X } from "lucide-react";
-import { EditNum, EditWrapText } from "@/components/nutrition/edit-cell";
-import { LinkCell } from "@/components/nutrition/link-picker";
+import { ArrowDown, ArrowUp } from "lucide-react";
+import { IngredientDialog } from "@/components/nutrition/ingredient-dialog";
 import { usePerson } from "@/components/person-provider";
 import { cn } from "@/lib/utils";
 import {
-  deleteFood,
   fmt0,
   perGramProtein,
   rupees2,
-  tidyLabel,
-  updateFood,
   type Food,
   type MealItem,
 } from "@/lib/nutrition";
@@ -22,13 +18,44 @@ import {
  *
  * Built to be read at a counter with a price board in front of you, so the two
  * columns that survive a phone screen are what it costs and what a gram of
- * protein costs. The rest appear as the screen widens.
+ * protein costs. Tap any row to open the ingredient itself — that dialog is
+ * the only place these figures are edited, here or anywhere else.
  *
  * Edible/kg is the one column nothing reads. It says how much of the kilo is
- * food and how much is bone, shell or peel — a measure of the buy, not an
- * input to it. Both per-kilo figures already include that waste, so dividing
- * by it as well would count it twice.
+ * food and how much is bone, shell or peel, and it is deliberately kept out of
+ * the arithmetic: it is a figure that has to be measured by hand, most rows
+ * will never have it, and a calculation that silently assumed 1 for the rest
+ * is exactly the confusion this table was built to end.
  */
+
+type Key = "name" | "nutrients" | "cost" | "protein" | "edible" | "rate";
+
+const COLUMNS: {
+  key: Key;
+  label: React.ReactNode;
+  align: "left" | "right";
+  /** Which breakpoint the column appears at; undefined means always. */
+  at?: string;
+}[] = [
+  { key: "name", label: "Name", align: "left" },
+  { key: "nutrients", label: "Nutrients", align: "left", at: "md" },
+  { key: "cost", label: <>Cost <Unit>₹/kg</Unit></>, align: "right" },
+  { key: "protein", label: <>Protein <Unit>g/kg</Unit></>, align: "right", at: "sm" },
+  { key: "edible", label: <>Edible <Unit>g/kg</Unit></>, align: "right", at: "lg" },
+  { key: "rate", label: <><Unit>₹ / g</Unit> protein</>, align: "right" },
+];
+
+function valueOf(food: Food, key: Key): string | number | null {
+  switch (key) {
+    case "name": return food.name.toLowerCase();
+    case "nutrients": return food.nutrients?.toLowerCase() ?? null;
+    case "cost": return food.price_per_kg;
+    case "protein": return food.protein_g_per_kg;
+    case "edible": return food.edible_g_per_kg;
+    case "rate": return perGramProtein(food);
+  }
+}
+
 export function IngredientsTable({
   foods,
   items,
@@ -42,15 +69,33 @@ export function IngredientsTable({
 }) {
   const { personId, canEdit } = usePerson();
   const editable = canEdit(personId);
+  const [sort, setSort] = React.useState<{ key: Key; desc: boolean } | null>(null);
+  const [open, setOpen] = React.useState<string | null>(null);
 
-  // meal_items.food_id cascades on delete, so removing a food silently takes
-  // every ingredient line built on it. Counting them first is what lets the
-  // confirmation say so out loud.
   const usage = React.useMemo(() => {
     const m = new Map<string, number>();
     for (const it of items) m.set(it.food_id, (m.get(it.food_id) ?? 0) + 1);
     return m;
   }, [items]);
+
+  const rows = React.useMemo(() => {
+    if (!sort) return foods;
+    const dir = sort.desc ? -1 : 1;
+    return [...foods].sort((a, b) => {
+      const x = valueOf(a, sort.key);
+      const y = valueOf(b, sort.key);
+      // A blank is a figure nobody has looked up. It is not the smallest
+      // value, so it sits at the bottom whichever way the column is pointing.
+      if (x === null && y === null) return 0;
+      if (x === null) return 1;
+      if (y === null) return -1;
+      return (typeof x === "string" ? String(x).localeCompare(String(y)) : Number(x) - Number(y)) * dir;
+    });
+  }, [foods, sort]);
+
+  // Re-resolve against the latest fetch, so an edit inside the dialog is
+  // reflected the moment it saves rather than when it is closed.
+  const live = open ? (foods.find((f) => f.id === open) ?? null) : null;
 
   if (foods.length === 0) {
     return (
@@ -65,132 +110,104 @@ export function IngredientsTable({
       <table className="w-full border-collapse text-left">
         <thead>
           <tr className="text-[11px] uppercase tracking-wider text-muted-foreground">
-            <th scope="col" className="border-b px-3 py-2 font-normal">
-              Name
-            </th>
-            <th
-              scope="col"
-              className="hidden border-b px-3 py-2 font-normal md:table-cell"
-            >
-              Nutrients
-            </th>
-            <th scope="col" className="border-b px-2 py-2 text-right font-normal">
-              Cost <Unit>₹/kg</Unit>
-            </th>
-            <th
-              scope="col"
-              className="hidden border-b px-2 py-2 text-right font-normal sm:table-cell"
-            >
-              Protein <Unit>g/kg</Unit>
-            </th>
-            <th
-              scope="col"
-              className="hidden border-b px-2 py-2 text-right font-normal lg:table-cell"
-            >
-              Edible <Unit>g/kg</Unit>
-            </th>
-            <th scope="col" className="border-b px-3 py-2 text-right font-normal">
-              <Unit>₹ / g</Unit> protein
-            </th>
-            {editable ? <th scope="col" className="w-8 border-b" /> : null}
+            {COLUMNS.map((c) => {
+              const active = sort?.key === c.key;
+              return (
+                <th
+                  key={c.key}
+                  scope="col"
+                  aria-sort={active ? (sort.desc ? "descending" : "ascending") : "none"}
+                  className={cn(
+                    "border-b p-0 font-normal",
+                    c.at === "sm" && "hidden sm:table-cell",
+                    c.at === "md" && "hidden md:table-cell",
+                    c.at === "lg" && "hidden lg:table-cell"
+                  )}
+                >
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setSort((s) =>
+                        s?.key === c.key ? { key: c.key, desc: !s.desc } : { key: c.key, desc: false }
+                      )
+                    }
+                    title={`Sort by ${typeof c.label === "string" ? c.label : c.key}`}
+                    className={cn(
+                      "flex w-full items-center gap-1 px-3 py-2 transition-colors hover:text-foreground",
+                      c.align === "right" && "justify-end",
+                      active && "text-foreground"
+                    )}
+                  >
+                    <span>{c.label}</span>
+                    {active ? (
+                      sort.desc ? (
+                        <ArrowDown className="size-3 shrink-0" aria-hidden />
+                      ) : (
+                        <ArrowUp className="size-3 shrink-0" aria-hidden />
+                      )
+                    ) : null}
+                  </button>
+                </th>
+              );
+            })}
           </tr>
         </thead>
         <tbody>
-          {foods.map((food, i) => {
-            const last = i === foods.length - 1;
+          {rows.map((food, i) => {
+            const last = i === rows.length - 1;
             const rate = perGramProtein(food);
-            const cell = (extra?: string) =>
-              cn("px-2 py-3 text-right", !last && "border-b", extra);
-
-            const nutrients = (
-              <EditWrapText
-                value={food.nutrients}
-                placeholder="—"
-                emptyHint="What this is worth eating for"
-                className="text-sm text-muted-foreground"
-                disabled={!editable}
-                onSave={async (v) => {
-                  await updateFood(food.id, { nutrients: v });
-                  onChanged();
-                }}
-              />
+            const num = (v: number | null, extra?: string) => (
+              <td
+                className={cn(
+                  "px-3 py-3 text-right text-sm tabular-nums",
+                  !last && "border-b",
+                  extra
+                )}
+              >
+                {v === null ? <span className="text-muted-foreground">—</span> : fmt0(v)}
+              </td>
             );
 
             return (
-              <tr key={food.id} className="align-top">
-                <td className={cn("px-1.5 py-3", !last && "border-b")}>
-                  <div className="flex items-start gap-1">
-                    {/* Wrapping rather than an input: "Bangda (Indian
-                        mackerel)" clips in a phone column, and a name you
-                        cannot read is worse than one you cannot edit in
-                        place. Tapping it still opens the field. */}
-                    <div className="min-w-0 flex-1">
-                      <EditWrapText
-                        value={food.name}
-                        className="font-serif text-base"
-                        disabled={!editable}
-                        onSave={async (v) => {
-                          // A nameless ingredient is unfindable, so an empty
-                          // field rolls back rather than saving.
-                          if (!v) throw new Error("name required");
-                          await updateFood(food.id, { name: tidyLabel(v) });
-                          onChanged();
-                        }}
-                      />
-                    </div>
-                    {/* Same link affordance as Edit food — one way to attach
-                        a product page, not two. */}
-                    <LinkCell food={food} editable={editable} onChanged={onChanged} />
-                  </div>
+              <tr
+                key={food.id}
+                role="button"
+                tabIndex={0}
+                aria-label={`Edit ${food.name}`}
+                onClick={() => setOpen(food.id)}
+                onKeyDown={(e) => {
+                  if (e.target !== e.currentTarget) return;
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    setOpen(food.id);
+                  }
+                }}
+                className={cn(
+                  "cursor-pointer align-top transition-colors",
+                  "hover:bg-muted/40 focus-visible:bg-muted/40 focus-visible:outline-none"
+                )}
+              >
+                <td className={cn("px-3 py-3", !last && "border-b")}>
+                  <span className="block font-serif text-base">{food.name}</span>
                   {/* Below md the nutrients ride under the name, the way the
                       food column rides under the event in The day. */}
-                  <div className="mt-0.5 md:hidden">{nutrients}</div>
+                  <span className="mt-0.5 block text-sm text-muted-foreground md:hidden">
+                    {food.nutrients ?? "—"}
+                  </span>
                 </td>
 
                 <td
-                  className={cn("hidden px-1.5 py-3 md:table-cell", !last && "border-b")}
+                  className={cn(
+                    "hidden px-3 py-3 text-sm text-muted-foreground md:table-cell",
+                    !last && "border-b"
+                  )}
                 >
-                  {nutrients}
+                  {food.nutrients ?? "—"}
                 </td>
 
-                <td className={cell()}>
-                  <EditNum
-                    value={food.price_per_kg}
-                    width="w-16"
-                    disabled={!editable}
-                    emptyHint="What a kilo costs you"
-                    onSave={async (v) => {
-                      await updateFood(food.id, { price_per_kg: v });
-                      onChanged();
-                    }}
-                  />
-                </td>
-
-                <td className={cell("hidden sm:table-cell")}>
-                  <EditNum
-                    value={food.protein_g_per_kg}
-                    width="w-14"
-                    disabled={!editable}
-                    emptyHint="Protein in a kilo as bought"
-                    onSave={async (v) => {
-                      await updateFood(food.id, { protein_g_per_kg: v });
-                      onChanged();
-                    }}
-                  />
-                </td>
-
-                <td className={cell("hidden lg:table-cell")}>
-                  <EditNum
-                    value={food.edible_g_per_kg}
-                    width="w-14"
-                    disabled={!editable}
-                    emptyHint="How much of a kilo is food, not waste"
-                    onSave={async (v) => {
-                      await updateFood(food.id, { edible_g_per_kg: v });
-                      onChanged();
-                    }}
-                  />
-                </td>
+                {num(food.price_per_kg)}
+                {num(food.protein_g_per_kg, "hidden sm:table-cell")}
+                {num(food.edible_g_per_kg, "hidden lg:table-cell")}
 
                 {/* Derived, so it can never disagree with the two figures it
                     comes from. A dash means one of them is still blank —
@@ -207,16 +224,6 @@ export function IngredientsTable({
                     rupees2(rate)
                   )}
                 </td>
-
-                {editable ? (
-                  <td className={cn("px-1 py-3", !last && "border-b")}>
-                    <RemoveFood
-                      food={food}
-                      usedIn={usage.get(food.id) ?? 0}
-                      onChanged={onChanged}
-                    />
-                  </td>
-                ) : null}
               </tr>
             );
           })}
@@ -224,8 +231,10 @@ export function IngredientsTable({
       </table>
 
       <p className="border-t px-3 py-2 text-[11px] leading-relaxed text-muted-foreground">
-        Everything is per kilo as purchased, waste included. Edible/kg is there
-        to show what you are throwing away — nothing calculates from it.
+        Everything is per kilo as purchased, waste included — which is why cost
+        divided by protein needs no adjustment. Tap a row to edit the
+        ingredient. Edible/kg is there to show what you are throwing away;
+        nothing calculates from it.
         {foods.some((f) => perGramProtein(f) === null) ? (
           <>
             {" "}
@@ -234,63 +243,20 @@ export function IngredientsTable({
           </>
         ) : null}
       </p>
+
+      {live ? (
+        <IngredientDialog
+          food={live}
+          usedIn={usage.get(live.id) ?? 0}
+          editable={editable}
+          onChanged={onChanged}
+          onClose={() => setOpen(null)}
+        />
+      ) : null}
     </div>
   );
 }
 
 function Unit({ children }: { children: React.ReactNode }) {
   return <span className="normal-case tracking-normal">{children}</span>;
-}
-
-/**
- * Removing a food is not only removing a row: the meal_items foreign key
- * cascades, so every ingredient line built on it disappears with it and the
- * days it appeared in quietly get cheaper and lighter. The confirmation says
- * how many, because that is the part you cannot see from here.
- */
-function RemoveFood({
-  food,
-  usedIn,
-  onChanged,
-}: {
-  food: Food;
-  usedIn: number;
-  onChanged: () => void;
-}) {
-  const [busy, setBusy] = React.useState(false);
-
-  return (
-    <button
-      type="button"
-      disabled={busy}
-      aria-label={`Remove ${food.name}`}
-      title={
-        usedIn
-          ? `Remove ${food.name} — used ${usedIn} ${usedIn === 1 ? "time" : "times"} in your meals`
-          : `Remove ${food.name}`
-      }
-      onClick={async () => {
-        const warning = usedIn
-          ? `Remove "${food.name}"?\n\nIt is used ${usedIn} ${
-              usedIn === 1 ? "time" : "times"
-            } in your meals. Those ingredient lines go too, and the days they are in will drop the calories, protein and cost they contributed.`
-          : `Remove "${food.name}"? It is not used in any meal.`;
-        if (!window.confirm(warning)) return;
-        setBusy(true);
-        try {
-          await deleteFood(food.id);
-          onChanged();
-        } finally {
-          setBusy(false);
-        }
-      }}
-      className={cn(
-        "grid size-6 place-items-center rounded-md text-muted-foreground/60",
-        "transition-colors hover:bg-muted hover:text-foreground",
-        busy && "opacity-40"
-      )}
-    >
-      <X className="size-3.5" aria-hidden />
-    </button>
-  );
 }

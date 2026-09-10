@@ -221,22 +221,26 @@ begin
   end if;
 
   if p_tool = 'nutrition' then
-    -- Same arithmetic as the page: nutrition per 100 g of edible weight,
-    -- grams as weighed, price as entered for the item in that meal.
+    -- Same arithmetic as the page, and there is only one: every figure on the
+    -- ingredient is per kg AS PURCHASED, so a serving is grams x that rate.
+    -- Nothing is yield-adjusted and no price is stated per serving.
     with items as (
       select ml.id as meal_id, ml.person_id, mf.name as food, mf.sort as food_sort, mi.sort,
              f.name as ingredient, mi.amount_unit, mi.qty_g, f.grams_per_ml, f.grams_per_piece,
-             mi.price, mi.comments, f.nutrients, f.source_url, f.kcal is not null as figures_known,
-             coalesce(f.kcal, 0)      * e.k as kcal,
-             coalesce(f.protein_g, 0) * e.k as protein_g,
-             coalesce(f.carb_g, 0)    * e.k as carb_g,
-             coalesce(f.fat_g, 0)     * e.k as fat_g,
-             coalesce(f.fiber_g, 0)   * e.k as fiber_g
+             mi.comments, f.nutrients, f.source_url,
+             f.kcal_per_kg is not null as figures_known,
+             f.price_per_kg is not null as rate_known,
+             coalesce(f.price_per_kg, 0)     * e.k as price,
+             coalesce(f.kcal_per_kg, 0)      * e.k as kcal,
+             coalesce(f.protein_g_per_kg, 0) * e.k as protein_g,
+             coalesce(f.carb_g_per_kg, 0)    * e.k as carb_g,
+             coalesce(f.fat_g_per_kg, 0)     * e.k as fat_g,
+             coalesce(f.fiber_g_per_kg, 0)   * e.k as fiber_g
         from public.meals ml
         join public.meal_items mi on mi.meal_id = ml.id
         join public.foods f on f.id = mi.food_id
         left join public.meal_foods mf on mf.id = mi.meal_food_id
-        cross join lateral (select mi.qty_g * coalesce(f.edible_yield, 1) / 100 as k) e
+        cross join lateral (select mi.qty_g / 1000.0 as k) e
        where ml.person_id = any(ids))
     select coalesce(jsonb_agg(jsonb_build_object(
       'person', coalesce(p.display_name, p.id),
@@ -270,9 +274,10 @@ begin
                             'kcal', round(i.kcal, 1), 'protein_g', round(i.protein_g, 1),
                             'carb_g', round(i.carb_g, 1), 'fat_g', round(i.fat_g, 1),
                             'fiber_g', round(i.fiber_g, 1),
-                            'price_inr', i.price, 'comments', nullif(i.comments, ''),
+                            'price_inr', case when i.rate_known then round(i.price, 2) end,
+                            'comments', nullif(i.comments, ''),
                             'nutrition', nullif(i.nutrients, ''), 'source', nullif(i.source_url, ''),
-                            'figures_known', i.figures_known)
+                            'figures_known', i.figures_known, 'rate_known', i.rate_known)
                           order by i.food_sort, i.sort), '[]'::jsonb)
                      from items i where i.meal_id = ml.id),
                  'totals', (
@@ -282,7 +287,7 @@ begin
                             'carb_g', round(coalesce(sum(i.carb_g), 0), 1),
                             'fat_g', round(coalesce(sum(i.fat_g), 0), 1),
                             'fiber_g', round(coalesce(sum(i.fiber_g), 0), 1),
-                            'cost_inr', coalesce(sum(i.price), 0))
+                            'cost_inr', round(coalesce(sum(i.price), 0), 2))
                      from items i where i.meal_id = ml.id))
                order by ml.at_time nulls last, ml.sort), '[]'::jsonb)
           from public.meals ml where ml.person_id = p.id),
@@ -293,14 +298,18 @@ begin
                  'carb_g', round(coalesce(sum(i.carb_g), 0), 1),
                  'fat_g', round(coalesce(sum(i.fat_g), 0), 1),
                  'fiber_g', round(coalesce(sum(i.fiber_g), 0), 1),
-                 'cost_inr', coalesce(sum(i.price), 0))
+                 'cost_inr', round(coalesce(sum(i.price), 0), 2))
           from items i where i.person_id = p.id)
     ) order by p.id), '[]'::jsonb) into res
       from public.people p where p.id = any(ids);
     return jsonb_build_object(
       'note', 'A planned standard day for each person, not a log of what was eaten on a date. '
-              'Nutrition is per 100 g of edible weight, grams are as weighed, and prices are '
-              'what the item cost in that meal, in rupees.',
+              'Every serving figure here is DERIVED: grams x the ingredient''s per-kilo rate, '
+              'where per kilo means AS PURCHASED, bone and shell included. There is no second '
+              'denominator and nothing is yield-adjusted, so do not apply edible weight to any '
+              'of it. figures_known false means that food has no nutrition yet and contributes '
+              'nothing rather than zero; rate_known false means the same for its price. '
+              'Where `source` is set, that page is the authority (rule R11).',
       'people', res);
   end if;
 
@@ -314,9 +323,10 @@ begin
               'bone, shell and peel included in both the cost and the protein, which '
               'is why inr_per_g_protein needs no yield adjustment and why applying '
               'edible_g_per_kg to it would count the waste twice. edible_g_per_kg is '
-              'an efficiency reading only. per_100g_edible uses a different '
-              'denominator: edible weight, as the meal figures do. A null is a figure '
-              'nobody has looked up yet, never a zero. Sorted cheapest protein first. '
+              'an efficiency reading only and an input to nothing. Every other figure '
+              'shares that one denominator, so a serving is simply grams x the rate. '
+              'A null is a figure nobody has looked up yet, never a zero. '
+              'Sorted cheapest protein first. '
               'Where `source` is set, that page is the authority for this food''s '
               'numbers — read it before estimating (see rule R11).',
       'ingredients', (
@@ -330,9 +340,10 @@ begin
                    when f.price_per_kg is null or coalesce(f.protein_g_per_kg, 0) = 0
                    then null else round(f.price_per_kg / f.protein_g_per_kg, 2) end,
                  'source', nullif(f.source_url, ''),
-                 'per_100g_edible', case when f.kcal is null then null else jsonb_build_object(
-                   'kcal', f.kcal, 'protein_g', f.protein_g, 'carb_g', f.carb_g,
-                   'fat_g', f.fat_g, 'fiber_g', f.fiber_g) end,
+                 'kcal_per_kg', f.kcal_per_kg,
+                 'carb_g_per_kg', f.carb_g_per_kg,
+                 'fat_g_per_kg', f.fat_g_per_kg,
+                 'fiber_g_per_kg', f.fiber_g_per_kg,
                  'used_in_meals', (select count(*) from public.meal_items mi
                                     join public.meals ml on ml.id = mi.meal_id
                                    where mi.food_id = f.id and ml.person_id = any(ids)),

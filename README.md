@@ -41,12 +41,20 @@ Run `supabase/nutrition.sql` to add a **Nutrition** tab: an ingredient library
 priced the way you actually shop, meal plans built from it, and macro / activity
 targets to measure the plan against.
 
-The design decision that makes it useful: nutrition is stored per 100 g of
-**edible** weight, price is per kg **as purchased**, and `edible_yield` bridges
-the two. Bone-in chicken at 0.65 means a kilo off the scale leaves 650 g you can
-eat — so cost-per-gram-of-protein counts the bone you paid for but not the
-protein you didn't get. `meal_items.share` covers dishes split between people:
-enter the 400 g you cooked once, and each person's day picks up their fraction.
+The design decision that makes it useful: **every figure on an ingredient is
+per kilo as purchased** — cost, calories, protein, carbohydrate, fat, fibre —
+so a serving is grams times that rate and nothing else. One denominator, no
+bridging factor, no question about whether the 160 g of chicken on the row is
+the bone-in weight or the meat. It is the bone-in weight, and the rate already
+knows.
+
+That replaced a two-basis design (nutrition per 100 g *edible*, price per kg
+*as purchased*, `edible_yield` bridging them) which was arithmetically fine and
+impossible to read. Worse, `edible_yield` defaulted to 1, so every food nobody
+had measured silently claimed zero waste and the totals believed it.
+`edible_g_per_kg` now records the same fact for interest only — it is read by
+nothing, because it is a number that has to be measured by hand and most rows
+will never have it.
 
 **The day** reads as a timetable: time, event, what was eaten, and the derived
 calories, protein and cost. The first three edit in place; the totals do not,
@@ -60,10 +68,11 @@ in grams, millilitres or pieces — grams stay canonical, and because "half a
 cucumber" means nothing without knowing what a cucumber weighs, the unit picker
 asks for that conversion in the same breath.
 
-Price is entered per item per meal, not as a per-kg rate. What a thing cost in
-a meal is something you know; what it costs per kilo is a rate you would have
-to work out, and per-meal is what adds up to a weekly or monthly food bill
-anyway.
+Price and nutrition per serving are **derived**, never typed. The ingredient is
+the single place either is stated, so the same fact cannot be entered in two
+tables and left to disagree with itself. A row in **Edit food** owns exactly one
+thing — how much of the ingredient was eaten — and tapping it opens the
+ingredient rather than a second copy of its figures.
 
 Ingredients are added by typing a name, not picking from a list — write down
 what you ate now, look the numbers up later. A food with no figures says so
