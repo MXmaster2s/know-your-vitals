@@ -7,6 +7,7 @@ import { EditNum, EditWrapText } from "@/components/nutrition/edit-cell";
 import { safeUrl } from "@/components/nutrition/link-picker";
 import { cn } from "@/lib/utils";
 import {
+  NUTRIENTS,
   deleteFood,
   tidyLabel,
   unitOf,
@@ -28,6 +29,7 @@ export const AI_FIELDS = [
   "carb_g_per_unit",
   "fat_g_per_unit",
   "fiber_g_per_unit",
+  ...NUTRIENTS.filter((n) => n.micro).map((n) => n.col),
 ] as const;
 
 /**
@@ -133,6 +135,25 @@ export function IngredientDialog({
             <Num label="Edible g" value={food.edible_g_per_unit} editable={editable}
                  onSave={async (v) => { await set({ edible_g_per_unit: v })(); }} />
           </dl>
+          {/* Twelve more rates on the same basis. Folded, because most visits
+              are about the price or the protein and a 19-row panel would put
+              the Remove link out of reach on a phone. */}
+          <details className="mt-1.5 border-t pt-1.5">
+            <summary className="cursor-pointer select-none text-sm text-muted-foreground">
+              Micronutrients {AI_MARK}
+            </summary>
+            <dl className="mt-1 divide-y">
+              {NUTRIENTS.filter((n) => n.micro).map((n) => (
+                <Num
+                  key={n.key}
+                  label={`${n.label} ${n.unit} ${AI_MARK}`}
+                  value={food[n.col] as number | null}
+                  editable={editable}
+                  onSave={async (v) => { await set({ [n.col]: v } as Partial<Food>)(); }}
+                />
+              ))}
+            </dl>
+          </details>
         </div>
 
         <Row label="Product link">

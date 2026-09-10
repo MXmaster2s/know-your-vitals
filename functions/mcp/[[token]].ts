@@ -103,16 +103,18 @@ const TOOLS = [
     description:
       "Each person's planned standard day: meals with time, the foods in them " +
       "and their ingredients with grams, per-item and per-meal kcal, protein, " +
-      "carbohydrate, fat, fibre and cost in rupees, plus nutrition and " +
-      "activity targets. A plan, not a log.",
+      "carbohydrate, fat, fibre, cost in rupees and twelve micronutrients " +
+      "(iron to omega-3, under `micros`), plus nutrition and activity " +
+      "targets. A plan, not a log.",
     inputSchema: { type: "object", properties: {}, additionalProperties: false },
   },
   {
     name: "ingredients",
     description:
       "The pantry priced the way it is bought: every ingredient with its cost " +
-      "per kilo, protein per kilo, edible per kilo and rupees per gram of " +
-      "protein, plus the product link where one is recorded. Everything is " +
+      "per kilo, protein per kilo, edible per kilo, rupees per gram of " +
+      "protein and the micronutrient rates, plus the product link where one " +
+      "is recorded. Everything is " +
       "per kilo AS PURCHASED. Use this to compare what to buy, or a price " +
       "board against what is already in the kitchen.",
     inputSchema: { type: "object", properties: {}, additionalProperties: false },

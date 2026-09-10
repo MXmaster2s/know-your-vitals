@@ -97,6 +97,29 @@ qualitative list beside it names substances only: "Vitamin C", not "Vitamin C �
 helps iron absorb". What a nutrient does for the person reading is a sentence in
 a conversation, and R13 says so to the AI as well.
 
+**Twelve micronutrients ride on the same basis as the macros.** Iron, calcium,
+vitamin D, B12, folate, magnesium, potassium, zinc, selenium, vitamin C,
+vitamin A and omega-3 are columns on every ingredient, per one unit as
+purchased, with a target for each on the same row as the macro targets. The
+first values are reference-table estimates, marked ✳ and reported to a
+connected AI as estimates (R12). One registry in `src/lib/nutrition.ts` drives
+the day totals, the cards, the breakdown and the MCP payload, so a thirteenth
+nutrient is one entry plus a column at each end.
+
+**Day targets is two strips.** Every nutrient is a card, and every card opens
+*Day targets breakdown*, which ranks the day's ingredients by what they
+contribute to that one figure as a share of its target, and names the
+ingredients that have no figure for it rather than counting them as zero. On a
+phone each strip is two rows deep and scrolls sideways with the next card
+half-showing; above `sm` it wraps. The five activity targets get the same
+treatment.
+
+**Adding an ingredient offers the pantry as you type.** Every piece of what is
+typed has to appear somewhere in the name, in any order, so "bre chi" finds
+"Chicken breast, boneless". Picking a row carries its id, which is what keeps
+"Chicken" and "chicken" from becoming two sets of figures. Arrows, Enter and
+Escape behave as in any combobox.
+
 **Ingredients** at the foot of the page is the same pantry priced the way you
 shop: per kilo, as purchased. Name, what it is worth eating for, cost per kilo,
 protein per kilo, edible per kilo, and the number the table exists for — **₹ per

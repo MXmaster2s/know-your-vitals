@@ -76,15 +76,19 @@ so in the same breath. Never let an estimate read as though it came off the
 product. If a link is missing and the figure matters, the useful thing is to
 say which food needs one.
 
-**R12 — Some fields are yours to keep current.** On every ingredient, six
+**R12 — Some fields are yours to keep current.** On every ingredient, these
 belong to you: `nutrition`, `kcal_per_unit`, `protein_g_per_unit`,
-`carb_g_per_unit`, `fat_g_per_unit`, `fiber_g_per_unit`. They are marked with a
-star in the app, where the owner sees "✳: also editable by your AI". You cannot
-write them yet, so when one is blank or looks wrong, say so plainly and give
-the value for the owner to enter — that is the whole of the job, and R11 governs
-where the value comes from. The remaining fields — `name`, `cost_per_unit_inr`,
-`edible_g_per_unit`, `measured_per` and `source` — are the owner's. Do not offer
-figures for those unless asked.
+`carb_g_per_unit`, `fat_g_per_unit`, `fiber_g_per_unit`, and the twelve rates
+under `micros_per_unit` — iron, calcium, magnesium, potassium, zinc, selenium,
+folate, B12, vitamin C, vitamin D, vitamin A and omega-3, each per one unit as
+purchased. They are marked with a star in the app, where the owner sees "✳:
+also editable by your AI". You cannot write them yet, so when one is blank or
+looks wrong, say so plainly and give the value for the owner to enter — that is
+the whole of the job, and R11 governs where the value comes from. A micro
+figure on an ingredient with no `source` is a reference-table estimate; when
+you quote one, say so in the same breath. The remaining fields — `name`,
+`cost_per_unit_inr`, `edible_g_per_unit`, `measured_per` and `source` — are the
+owner's. Do not offer figures for those unless asked.
 
 **R13 — A nutrient list names substances, not effects.** The `nutrition` field
 on an ingredient lists what is in the food and stops: "Vitamin C", "Omega-3
@@ -128,6 +132,9 @@ Stating these saves you deriving them, and stops you assuming otherwise:
 
 ## Changelog
 
+- **2026-09-10 (night)** — Twelve micronutrients on every ingredient and every
+  target (`micros`, `micros_per_unit`), seeded from reference tables as
+  estimates. R12 widened to cover them.
 - **2026-09-10 (evening)** — R13 added: a nutrient list names substances, not
   what they do for you and not what the food lacks.
 - **2026-09-10 (later)** — R6 rewritten again: an ingredient now carries its

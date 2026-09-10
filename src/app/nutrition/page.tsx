@@ -7,6 +7,7 @@ import { UploadReports } from "@/components/upload-reports";
 import { DayTargets } from "@/components/nutrition/day-targets";
 import { MealDialog } from "@/components/nutrition/meal-dialog";
 import { ModuleHeading } from "@/components/nutrition/module-heading";
+import { TargetBreakdown } from "@/components/nutrition/target-breakdown";
 import { Skeleton } from "@/components/ui/skeleton";
 import { usePerson } from "@/components/person-provider";
 import { useNutritionData } from "@/lib/use-nutrition-data";
@@ -17,6 +18,7 @@ export default function NutritionPage() {
   const { personId, labelFor, roster, meId } = usePerson();
   const { data, error, refresh } = useNutritionData();
   const [openMeal, setOpenMeal] = React.useState<Meal | null>(null);
+  const [openNutrient, setOpenNutrient] = React.useState<string | null>(null);
 
   // Nutrition is usable without a dashboard and without paying, so a newcomer
   // needs one target row to edit against — the cards are otherwise inert.
@@ -72,6 +74,7 @@ export default function NutritionPage() {
           target={target}
           activity={data.activity}
           onChanged={refresh}
+          onOpen={setOpenNutrient}
         />
       </section>
 
@@ -98,6 +101,18 @@ export default function NutritionPage() {
       {/* Nutrition works without a dashboard and without paying, so the
           reports live at the foot here too rather than blocking the page. */}
       {roster === "mine" ? <UploadReports variant="section" /> : null}
+
+      {openNutrient ? (
+        <TargetBreakdown
+          nutrientKey={openNutrient}
+          meals={data.meals}
+          items={data.items}
+          foods={data.foods}
+          target={target}
+          onPick={setOpenNutrient}
+          onClose={() => setOpenNutrient(null)}
+        />
+      ) : null}
 
       <MealDialog
         meal={liveMeal}

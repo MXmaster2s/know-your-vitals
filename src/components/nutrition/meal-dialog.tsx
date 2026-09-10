@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { EditNum, EditText, EditWrapText } from "@/components/nutrition/edit-cell";
 import { AI_MARK, IngredientDialog } from "@/components/nutrition/ingredient-dialog";
 import { NutrientPills } from "@/components/nutrition/nutrient-pills";
+import { IngredientCombobox } from "@/components/nutrition/ingredient-combobox";
 import { usePerson } from "@/components/person-provider";
 import { cn } from "@/lib/utils";
 import {
@@ -164,6 +165,7 @@ export function MealDialog({
             <FoodBox
               onOpenFood={setOpenFood}
               key={box.id}
+              foods={foods}
               box={box}
               meal={meal}
               items={items.filter((i) => i.meal_food_id === box.id)}
@@ -214,6 +216,7 @@ function FoodBox({
   box,
   meal,
   items,
+  foods,
   foodById,
   editable,
   onChanged,
@@ -222,6 +225,7 @@ function FoodBox({
   box: MealFood;
   meal: Meal;
   items: MealItem[];
+  foods: Food[];
   foodById: Map<string, Food>;
   editable: boolean;
   onChanged: () => void;
@@ -312,6 +316,7 @@ function FoodBox({
           <AddIngredient
             mealId={meal.id}
             mealFoodId={box.id}
+            foods={foods}
             nextSort={(rows[rows.length - 1]?.sort ?? 0) + 1}
             onAdded={onChanged}
           />
@@ -510,11 +515,13 @@ function Cell({
 function AddIngredient({
   mealId,
   mealFoodId,
+  foods,
   nextSort,
   onAdded,
 }: {
   mealId: string;
   mealFoodId: string;
+  foods: Food[];
   nextSort: number;
   onAdded: () => void;
 }) {
@@ -522,6 +529,10 @@ function AddIngredient({
   const [qty, setQty] = React.useState("100");
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+  // Set when the name came off the list. Carrying the id rather than the text
+  // is what stops "Chicken" and "chicken" becoming two sets of figures.
+  const [picked, setPicked] = React.useState<Food | null>(null);
+  const amountUnit = picked ? unitOf(picked.base_unit).amount : "g";
   // Which households' ingredients an existing name may match, so typing
   // "Tomato" reuses this household's row and never another one's.
   const { people } = usePerson();
@@ -536,7 +547,10 @@ function AddIngredient({
     setBusy(true);
     setError(null);
     try {
-      const foodId = await findOrCreateFood(name, households);
+      const foodId =
+        picked && picked.name === name.trim()
+          ? picked.id
+          : await findOrCreateFood(name, households);
       await insertMealItem({
         meal_id: mealId,
         meal_food_id: mealFoodId,
@@ -546,6 +560,7 @@ function AddIngredient({
       });
       setName("");
       setQty("100");
+      setPicked(null);
       onAdded();
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -557,15 +572,22 @@ function AddIngredient({
   return (
     <div className="space-y-1">
       <div className="flex flex-wrap items-center gap-2">
-        <input
+        <IngredientCombobox
+          id={`add-${mealFoodId}`}
+          foods={foods}
           value={name}
-          onChange={(e) => setName(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") submit();
-          }}
           placeholder="Ingredient — paneer, ghee…"
-          aria-label="Ingredient name"
-          className="min-w-40 flex-1 rounded-md border bg-background px-2 py-1 text-xs"
+          onChange={(v) => {
+            setName(v);
+            setPicked(null);
+          }}
+          onPick={(f) => {
+            setName(f.name);
+            setPicked(f);
+            // 100 pieces of egg is never what anyone meant.
+            setQty(f.base_unit === "piece" ? "1" : "100");
+          }}
+          onEnter={submit}
         />
         <input
           inputMode="decimal"
@@ -577,7 +599,7 @@ function AddIngredient({
           aria-label="Grams"
           className="w-14 rounded-md border bg-background px-2 py-1 text-right text-xs tabular-nums"
         />
-        <span className="text-xs text-muted-foreground">g</span>
+        <span className="text-xs text-muted-foreground">{amountUnit}</span>
         <Button
           size="sm"
           variant="outline"

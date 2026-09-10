@@ -72,6 +72,21 @@ $$;
 -- What the server calls. One round trip: resolve the token, stamp it, answer
 -- the tool. Returns {"error": ...} rather than raising, so the server can
 -- tell "bad token" (HTTP 401) from "bad question" (a tool error).
+-- Twelve micronutrients as one object. Any null is dropped rather than
+-- written as 0, so "absent" keeps meaning "not looked up" all the way to the
+-- AI. Called with rate x amount for a serving, with sums for a total, with
+-- the bare rate for a pantry row, and with the target row's own columns.
+create or replace function public.mcp_micros_obj(
+  iron numeric, ca numeric, mg numeric, k numeric, zn numeric, se numeric,
+  fol numeric, b12 numeric, vitc numeric, vitd numeric, vita numeric, o3 numeric)
+returns jsonb language sql immutable as $$
+  select jsonb_strip_nulls(jsonb_build_object(
+    'iron_mg', round(iron, 2), 'calcium_mg', round(ca, 1), 'magnesium_mg', round(mg, 1),
+    'potassium_mg', round(k, 1), 'zinc_mg', round(zn, 2), 'selenium_ug', round(se, 1),
+    'folate_ug', round(fol, 1), 'b12_ug', round(b12, 2), 'vit_c_mg', round(vitc, 1),
+    'vit_d_ug', round(vitd, 2), 'vit_a_ug', round(vita, 1), 'omega3_g', round(o3, 2)))
+$$;
+
 drop function if exists public.mcp_call(text, text, jsonb);
 create function public.mcp_call(p_hash text, p_tool text, p_args jsonb default '{}'::jsonb)
   returns jsonb
@@ -167,7 +182,10 @@ begin
         select coalesce(jsonb_agg(jsonb_build_object(
                  'person', coalesce(p.display_name, p.id), 'label', nt.label,
                  'kcal', nt.kcal, 'protein_g', nt.protein_g, 'carb_g', nt.carb_g,
-                 'fat_g', nt.fat_g, 'fiber_g', nt.fiber_g, 'notes', nt.notes)
+                 'fat_g', nt.fat_g, 'fiber_g', nt.fiber_g, 'notes', nt.notes,
+                 'micros', public.mcp_micros_obj(nt.iron_mg, nt.calcium_mg, nt.magnesium_mg,
+                   nt.potassium_mg, nt.zinc_mg, nt.selenium_ug, nt.folate_ug, nt.b12_ug,
+                   nt.vit_c_mg, nt.vit_d_ug, nt.vit_a_ug, nt.omega3_g))
                order by p.id, nt.sort), '[]'::jsonb)
           from public.nutrition_targets nt join public.people p on p.id = nt.person_id
          where nt.person_id = any(ids) and nt.is_active),
@@ -236,7 +254,13 @@ begin
              coalesce(f.protein_g_per_unit, 0) * e.k as protein_g,
              coalesce(f.carb_g_per_unit, 0)    * e.k as carb_g,
              coalesce(f.fat_g_per_unit, 0)     * e.k as fat_g,
-             coalesce(f.fiber_g_per_unit, 0)   * e.k as fiber_g
+             coalesce(f.fiber_g_per_unit, 0)   * e.k as fiber_g,
+             f.iron_mg_per_unit * e.k as iron_mg, f.calcium_mg_per_unit * e.k as calcium_mg,
+             f.magnesium_mg_per_unit * e.k as magnesium_mg, f.potassium_mg_per_unit * e.k as potassium_mg,
+             f.zinc_mg_per_unit * e.k as zinc_mg, f.selenium_ug_per_unit * e.k as selenium_ug,
+             f.folate_ug_per_unit * e.k as folate_ug, f.b12_ug_per_unit * e.k as b12_ug,
+             f.vit_c_mg_per_unit * e.k as vit_c_mg, f.vit_d_ug_per_unit * e.k as vit_d_ug,
+             f.vit_a_ug_per_unit * e.k as vit_a_ug, f.omega3_g_per_unit * e.k as omega3_g
         from public.meals ml
         join public.meal_items mi on mi.meal_id = ml.id
         join public.foods f on f.id = mi.food_id
@@ -249,7 +273,10 @@ begin
         select coalesce(jsonb_agg(jsonb_build_object(
                  'label', nt.label, 'active', nt.is_active, 'from', nt.starts_on, 'to', nt.ends_on,
                  'kcal', nt.kcal, 'protein_g', nt.protein_g, 'carb_g', nt.carb_g,
-                 'fat_g', nt.fat_g, 'fiber_g', nt.fiber_g, 'notes', nt.notes)
+                 'fat_g', nt.fat_g, 'fiber_g', nt.fiber_g, 'notes', nt.notes,
+                 'micros', public.mcp_micros_obj(nt.iron_mg, nt.calcium_mg, nt.magnesium_mg,
+                   nt.potassium_mg, nt.zinc_mg, nt.selenium_ug, nt.folate_ug, nt.b12_ug,
+                   nt.vit_c_mg, nt.vit_d_ug, nt.vit_a_ug, nt.omega3_g))
                order by nt.is_active desc, nt.sort), '[]'::jsonb)
           from public.nutrition_targets nt where nt.person_id = p.id),
       'activity', (
@@ -268,6 +295,9 @@ begin
                             'kcal', round(i.kcal, 1), 'protein_g', round(i.protein_g, 1),
                             'carb_g', round(i.carb_g, 1), 'fat_g', round(i.fat_g, 1),
                             'fiber_g', round(i.fiber_g, 1),
+                            'micros', public.mcp_micros_obj(i.iron_mg, i.calcium_mg, i.magnesium_mg,
+                              i.potassium_mg, i.zinc_mg, i.selenium_ug, i.folate_ug, i.b12_ug,
+                              i.vit_c_mg, i.vit_d_ug, i.vit_a_ug, i.omega3_g),
                             'price_inr', case when i.rate_known then round(i.price, 2) end,
                             'comments', nullif(i.comments, ''),
                             'nutrition', nullif(i.nutrients, ''), 'source', nullif(i.source_url, ''),
@@ -281,6 +311,10 @@ begin
                             'carb_g', round(coalesce(sum(i.carb_g), 0), 1),
                             'fat_g', round(coalesce(sum(i.fat_g), 0), 1),
                             'fiber_g', round(coalesce(sum(i.fiber_g), 0), 1),
+                            'micros', public.mcp_micros_obj(sum(i.iron_mg), sum(i.calcium_mg),
+                              sum(i.magnesium_mg), sum(i.potassium_mg), sum(i.zinc_mg), sum(i.selenium_ug),
+                              sum(i.folate_ug), sum(i.b12_ug), sum(i.vit_c_mg), sum(i.vit_d_ug),
+                              sum(i.vit_a_ug), sum(i.omega3_g)),
                             'cost_inr', round(coalesce(sum(i.price), 0), 2))
                      from items i where i.meal_id = ml.id))
                order by ml.at_time nulls last, ml.sort), '[]'::jsonb)
@@ -292,6 +326,10 @@ begin
                  'carb_g', round(coalesce(sum(i.carb_g), 0), 1),
                  'fat_g', round(coalesce(sum(i.fat_g), 0), 1),
                  'fiber_g', round(coalesce(sum(i.fiber_g), 0), 1),
+                 'micros', public.mcp_micros_obj(sum(i.iron_mg), sum(i.calcium_mg),
+                   sum(i.magnesium_mg), sum(i.potassium_mg), sum(i.zinc_mg), sum(i.selenium_ug),
+                   sum(i.folate_ug), sum(i.b12_ug), sum(i.vit_c_mg), sum(i.vit_d_ug),
+                   sum(i.vit_a_ug), sum(i.omega3_g)),
                  'cost_inr', round(coalesce(sum(i.price), 0), 2))
           from items i where i.person_id = p.id)
     ) order by p.id), '[]'::jsonb) into res
@@ -304,7 +342,12 @@ begin
               'yield-adjusted, so do not apply edible weight to any of it. '
               'figures_known false means that food has no nutrition yet and contributes '
               'nothing rather than zero; rate_known false means the same for its price. '
-              'Where `source` is set, that page is the authority (rule R11).',
+              'Where `source` is set, that page is the authority (rule R11). '
+              '`micros` holds iron_mg, calcium_mg, magnesium_mg, potassium_mg, zinc_mg, '
+              'selenium_ug, folate_ug, b12_ug, vit_c_mg, vit_d_ug, vit_a_ug and omega3_g on '
+              'the same basis; a key that is missing has no figure yet, and a total only '
+              'sums the servings that have one, so it can only ever under-count. '
+              'Every micro figure without a `source` is a reference-table estimate.',
       'people', res);
   end if;
 
@@ -324,7 +367,9 @@ begin
               'A null is a figure nobody has looked up yet, never a zero. '
               'Sorted cheapest protein first. '
               'YOU are responsible for keeping these fields current: nutrition, kcal_per_unit, '
-              'protein_g_per_unit, carb_g_per_unit, fat_g_per_unit, fiber_g_per_unit. `nutrition` '
+              'protein_g_per_unit, carb_g_per_unit, fat_g_per_unit, fiber_g_per_unit, and every '
+              'key under micros_per_unit (iron_mg to omega3_g, per one unit as purchased; a '
+              'missing key is a figure nobody has looked up). `nutrition` '
               'names substances only — never what they do for the reader, never what the '
               'food lacks (rule R13). They are '
               'marked with a star in the app. You cannot write them yet, so report the values '
@@ -348,6 +393,10 @@ begin
                  'carb_g_per_unit', f.carb_g_per_unit,
                  'fat_g_per_unit', f.fat_g_per_unit,
                  'fiber_g_per_unit', f.fiber_g_per_unit,
+                 'micros_per_unit', public.mcp_micros_obj(f.iron_mg_per_unit, f.calcium_mg_per_unit,
+                   f.magnesium_mg_per_unit, f.potassium_mg_per_unit, f.zinc_mg_per_unit,
+                   f.selenium_ug_per_unit, f.folate_ug_per_unit, f.b12_ug_per_unit,
+                   f.vit_c_mg_per_unit, f.vit_d_ug_per_unit, f.vit_a_ug_per_unit, f.omega3_g_per_unit),
                  'used_in_meals', (select count(*) from public.meal_items mi
                                     join public.meals ml on ml.id = mi.meal_id
                                    where mi.food_id = f.id and ml.person_id = any(ids)),

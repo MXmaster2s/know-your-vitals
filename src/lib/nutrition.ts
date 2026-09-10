@@ -32,6 +32,21 @@ export interface Food {
   /** How much of a purchased kg is food rather than waste. Read by nothing —
    *  it measures the buy, it does not enter any calculation. */
   edible_g_per_unit: number | null;
+  /** Micronutrients, same basis as the macros: per ONE base unit as purchased.
+   *  Null is unknown and never zero, so a day total can say how much of itself
+   *  is actually accounted for. */
+  iron_mg_per_unit: number | null;
+  calcium_mg_per_unit: number | null;
+  magnesium_mg_per_unit: number | null;
+  potassium_mg_per_unit: number | null;
+  zinc_mg_per_unit: number | null;
+  selenium_ug_per_unit: number | null;
+  folate_ug_per_unit: number | null;
+  b12_ug_per_unit: number | null;
+  vit_c_mg_per_unit: number | null;
+  vit_d_ug_per_unit: number | null;
+  vit_a_ug_per_unit: number | null;
+  omega3_g_per_unit: number | null;
   /** What one piece weighs, when this is a thing you count rather than weigh. */
   grams_per_piece: number | null;
   /** What one ml weighs. Most liquids are ~1; oil is ~0.91. */
@@ -128,6 +143,18 @@ export interface NutritionTarget {
   carb_g: number | null;
   fat_g: number | null;
   fiber_g: number | null;
+  iron_mg: number | null;
+  calcium_mg: number | null;
+  magnesium_mg: number | null;
+  potassium_mg: number | null;
+  zinc_mg: number | null;
+  selenium_ug: number | null;
+  folate_ug: number | null;
+  b12_ug: number | null;
+  vit_c_mg: number | null;
+  vit_d_ug: number | null;
+  vit_a_ug: number | null;
+  omega3_g: number | null;
   is_active: boolean;
   notes: string | null;
   sort: number | null;
@@ -313,16 +340,73 @@ export interface Totals {
   fat_g: number;
   fiber_g: number;
   cost: number;
+  iron_mg: number;
+  calcium_mg: number;
+  magnesium_mg: number;
+  potassium_mg: number;
+  zinc_mg: number;
+  selenium_ug: number;
+  folate_ug: number;
+  b12_ug: number;
+  vit_c_mg: number;
+  vit_d_ug: number;
+  vit_a_ug: number;
+  omega3_g: number;
 }
 
-export const ZERO: Totals = {
-  kcal: 0,
-  protein_g: 0,
-  carb_g: 0,
-  fat_g: 0,
-  fiber_g: 0,
-  cost: 0,
-};
+/**
+ * One row per thing the day is counted in. Everything that adds a day up —
+ * the totals, the cards, the breakdown, the MCP payload — walks this list, so
+ * a new nutrient is one entry here plus one column at each end, never a
+ * thirteenth place to forget.
+ */
+export interface NutrientDef {
+  key: keyof Totals;
+  /** The per-unit rate on the ingredient. */
+  col: keyof Food;
+  /** The matching column on the target row; cost has none. */
+  target: keyof NutritionTarget | null;
+  label: string;
+  unit: string;
+  /** Decimals worth showing. Micrograms of B12 need one; calories need none. */
+  dp: number;
+  micro: boolean;
+}
+
+export const NUTRIENTS: NutrientDef[] = [
+  { key: "kcal", col: "kcal_per_unit", target: "kcal", label: "Calories", unit: "kcal", dp: 0, micro: false },
+  { key: "protein_g", col: "protein_g_per_unit", target: "protein_g", label: "Protein", unit: "g", dp: 0, micro: false },
+  { key: "carb_g", col: "carb_g_per_unit", target: "carb_g", label: "Carbs", unit: "g", dp: 0, micro: false },
+  { key: "fat_g", col: "fat_g_per_unit", target: "fat_g", label: "Fat", unit: "g", dp: 0, micro: false },
+  { key: "fiber_g", col: "fiber_g_per_unit", target: "fiber_g", label: "Fibre", unit: "g", dp: 0, micro: false },
+  { key: "cost", col: "price_per_unit", target: null, label: "Food cost", unit: "₹", dp: 0, micro: false },
+  { key: "iron_mg", col: "iron_mg_per_unit", target: "iron_mg", label: "Iron", unit: "mg", dp: 1, micro: true },
+  { key: "calcium_mg", col: "calcium_mg_per_unit", target: "calcium_mg", label: "Calcium", unit: "mg", dp: 0, micro: true },
+  { key: "vit_d_ug", col: "vit_d_ug_per_unit", target: "vit_d_ug", label: "Vitamin D", unit: "µg", dp: 1, micro: true },
+  { key: "b12_ug", col: "b12_ug_per_unit", target: "b12_ug", label: "Vitamin B12", unit: "µg", dp: 1, micro: true },
+  { key: "folate_ug", col: "folate_ug_per_unit", target: "folate_ug", label: "Folate", unit: "µg", dp: 0, micro: true },
+  { key: "magnesium_mg", col: "magnesium_mg_per_unit", target: "magnesium_mg", label: "Magnesium", unit: "mg", dp: 0, micro: true },
+  { key: "potassium_mg", col: "potassium_mg_per_unit", target: "potassium_mg", label: "Potassium", unit: "mg", dp: 0, micro: true },
+  { key: "zinc_mg", col: "zinc_mg_per_unit", target: "zinc_mg", label: "Zinc", unit: "mg", dp: 1, micro: true },
+  { key: "selenium_ug", col: "selenium_ug_per_unit", target: "selenium_ug", label: "Selenium", unit: "µg", dp: 0, micro: true },
+  { key: "vit_c_mg", col: "vit_c_mg_per_unit", target: "vit_c_mg", label: "Vitamin C", unit: "mg", dp: 0, micro: true },
+  { key: "vit_a_ug", col: "vit_a_ug_per_unit", target: "vit_a_ug", label: "Vitamin A", unit: "µg", dp: 0, micro: true },
+  { key: "omega3_g", col: "omega3_g_per_unit", target: "omega3_g", label: "Omega-3", unit: "g", dp: 1, micro: true },
+];
+
+export const nutrientBy = (key: string): NutrientDef | undefined =>
+  NUTRIENTS.find((n) => n.key === key);
+
+/** How a figure for this nutrient reads on its own. Cost is the one that
+ *  wears its unit in front. */
+export function nutrientValue(n: NutrientDef, v: number): string {
+  if (n.key === "cost") return rupees(v);
+  return `${v.toLocaleString("en-IN", { maximumFractionDigits: n.dp })} ${n.unit}`;
+}
+
+export const ZERO: Totals = Object.fromEntries(
+  NUTRIENTS.map((n) => [n.key, 0])
+) as unknown as Totals;
 
 /**
  * What one serving contributes. `qty_g` is the weight that went on the scale
@@ -334,16 +418,80 @@ export const ZERO: Totals = {
  * disagreeing with itself.
  */
 export function itemTotals(item: MealItem, food: Food | undefined): Totals {
-  if (!food) return { ...ZERO };
+  const out = { ...ZERO };
+  if (!food) return out;
   const u = unitsIn(item.qty ?? 0, food.base_unit);
-  return {
-    kcal: (food.kcal_per_unit ?? 0) * u,
-    protein_g: (food.protein_g_per_unit ?? 0) * u,
-    carb_g: (food.carb_g_per_unit ?? 0) * u,
-    fat_g: (food.fat_g_per_unit ?? 0) * u,
-    fiber_g: (food.fiber_g_per_unit ?? 0) * u,
-    cost: (food.price_per_unit ?? 0) * u,
-  };
+  const bag = out as unknown as Record<string, number>;
+  for (const n of NUTRIENTS) {
+    const rate = food[n.col] as number | null | undefined;
+    if (rate !== null && rate !== undefined) bag[n.key] = rate * u;
+  }
+  return out;
+}
+
+/** What one serving contributes of one nutrient, or null when the ingredient
+ *  has no figure for it. Null is the whole point: it is not zero, and a total
+ *  that swallows it is quietly wrong (R5). */
+export function itemOne(
+  item: MealItem,
+  food: Food | undefined,
+  n: NutrientDef
+): number | null {
+  if (!food) return null;
+  const rate = food[n.col] as number | null | undefined;
+  if (rate === null || rate === undefined) return null;
+  return rate * unitsIn(item.qty ?? 0, food.base_unit);
+}
+
+/** Lowercased, unaccented, and with every run of punctuation turned into a
+ *  single space, so "Toor / masoor dal (dry)" tokenises the way it reads. */
+function norm(v: string): string {
+  return v
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+/**
+ * Ingredients matching what has been typed so far.
+ *
+ * Every whitespace-separated piece of the query has to appear somewhere in the
+ * name, in any order — "bre chi" finds "Chicken breast, boneless" just as
+ * "chicken br" does, because nobody reliably remembers whether they filed it
+ * under the cut or the animal.
+ *
+ * Ranked by how early the match starts and whether it lands on a word
+ * boundary, so typing "ch" puts "Chicken" above "Hung curd", then by the
+ * shorter name, then alphabetically so the order never wobbles.
+ */
+export function matchFoods(foods: Food[], query: string, limit = 8): Food[] {
+  const tokens = norm(query).split(" ").filter(Boolean);
+  if (tokens.length === 0) return [];
+  const scored: { food: Food; score: number }[] = [];
+  for (const food of foods) {
+    const name = norm(food.name);
+    let score = 0;
+    let ok = true;
+    for (const t of tokens) {
+      const at = name.indexOf(t);
+      if (at < 0) {
+        ok = false;
+        break;
+      }
+      const wordStart = at === 0 || name[at - 1] === " ";
+      score += (at === 0 ? 0 : wordStart ? 40 : 120) + Math.min(at, 40);
+    }
+    if (ok) scored.push({ food, score: score / tokens.length });
+  }
+  scored.sort(
+    (a, b) =>
+      a.score - b.score ||
+      a.food.name.length - b.food.name.length ||
+      a.food.name.localeCompare(b.food.name)
+  );
+  return scored.slice(0, limit).map((x) => x.food);
 }
 
 /** True when the ingredient has nutrition figures at all. A food added by name
@@ -371,17 +519,13 @@ export const rupees2 = (n: number) =>
   `₹${n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 export function sumTotals(list: Totals[]): Totals {
-  return list.reduce<Totals>(
-    (acc, t) => ({
-      kcal: acc.kcal + t.kcal,
-      protein_g: acc.protein_g + t.protein_g,
-      carb_g: acc.carb_g + t.carb_g,
-      fat_g: acc.fat_g + t.fat_g,
-      fiber_g: acc.fiber_g + t.fiber_g,
-      cost: acc.cost + t.cost,
-    }),
-    { ...ZERO }
-  );
+  const out = { ...ZERO };
+  const bag = out as unknown as Record<string, number>;
+  for (const t of list) {
+    const one = t as unknown as Record<string, number>;
+    for (const n of NUTRIENTS) bag[n.key] += one[n.key] ?? 0;
+  }
+  return out;
 }
 
 export function mealTotals(
