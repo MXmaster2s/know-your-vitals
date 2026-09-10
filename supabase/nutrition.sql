@@ -162,3 +162,21 @@ begin
     execute format('grant select, insert, update, delete on public.%I to authenticated', t);
   end loop;
 end $$;
+
+-- ---------------------------------------------------- shopping figures ----
+-- The Ingredients table compares foods the way you buy them: per kilo, as
+-- purchased. Both are nullable on purpose — blank means "not looked up yet",
+-- which is a different thing from zero.
+--
+-- `protein_g_per_kg` is protein in one kg AS PURCHASED, so it already carries
+-- whatever bone, shell or peel came with it. That is what makes
+-- cost ÷ protein an honest per-kilo comparison, and it is why the figure is
+-- entered rather than derived from `protein_g` (which is per 100 g of edible
+-- weight, a different denominator).
+--
+-- `edible_g_per_kg` is deliberately NOT an input to any calculation. It says
+-- how much of the kilo is food and how much is waste, and nothing else reads
+-- it. `edible_yield` remains the number the meal maths uses; the two are kept
+-- apart so filling this in can never move a day's calories.
+alter table public.foods add column if not exists protein_g_per_kg numeric;
+alter table public.foods add column if not exists edible_g_per_kg  numeric;

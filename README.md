@@ -72,6 +72,22 @@ rather than counting as zero.
 Every number is editable inline — reference tables are approximations and your
 butcher's price is not.
 
+**Ingredients** at the foot of the page is the same pantry priced the way you
+shop: per kilo, as purchased. Name, what it is worth eating for, cost per kilo,
+protein per kilo, edible per kilo, and the number the table exists for — **₹ per
+gram of protein**.
+
+That last column is derived from the two beside it and never stored, so it
+cannot drift out of step with them. It is deliberately *not* yield-adjusted:
+both figures are per kilo as purchased, so the bone and the shell are already
+priced into each, and dividing by the edible fraction as well would charge you
+for the waste twice. `edible_g_per_kg` is therefore read by nothing at all — it
+measures the buy, not the maths, and is kept apart from `edible_yield` (which
+does drive meal nutrition) so filling it in can never move a day's calories.
+
+Blank means not looked up yet. It is never treated as zero, and the footer says
+how many rows are still waiting on a figure.
+
 ## Analytics
 
 With more than one reader, an **Analytics** section appears in the nav — but

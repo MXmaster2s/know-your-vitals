@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { DayTable } from "@/components/nutrition/day-table";
+import { IngredientsTable } from "@/components/nutrition/ingredients-table";
 import { UploadReports } from "@/components/upload-reports";
 import { DayTargets } from "@/components/nutrition/day-targets";
 import { MealDialog } from "@/components/nutrition/meal-dialog";
@@ -83,6 +84,11 @@ export default function NutritionPage() {
           onOpenMeal={setOpenMeal}
           onChanged={refresh}
         />
+      </section>
+
+      <section className="space-y-3">
+        <ModuleHeading>Ingredients</ModuleHeading>
+        <IngredientsTable foods={data.foods} onChanged={refresh} />
       </section>
 
       {/* Nutrition works without a dashboard and without paying, so the

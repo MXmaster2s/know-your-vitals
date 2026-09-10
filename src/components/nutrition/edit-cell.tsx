@@ -15,6 +15,7 @@ export function EditNum({
   width = "w-16",
   align = "right",
   disabled,
+  emptyHint,
 }: {
   value: number | null;
   onSave: (next: number | null) => Promise<void>;
@@ -22,6 +23,8 @@ export function EditNum({
   width?: string;
   align?: "left" | "right";
   disabled?: boolean;
+  /** Shown on hover while the cell is empty — says who fills it in. */
+  emptyHint?: string;
 }) {
   const text = value === null || value === undefined ? "" : String(value);
   const [draft, setDraft] = React.useState(text);
@@ -61,6 +64,7 @@ export function EditNum({
       <input
         inputMode="decimal"
         disabled={disabled}
+        title={draft ? undefined : emptyHint}
         value={draft}
         onChange={(e) => setDraft(e.target.value)}
         onBlur={commit}

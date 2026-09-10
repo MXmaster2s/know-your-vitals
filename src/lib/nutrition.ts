@@ -13,8 +13,16 @@ export interface Food {
   fiber_g: number | null;
   /** ₹ per kg as purchased. */
   price_per_kg: number | null;
-  /** Edible fraction of the purchased weight — 0.65 for bone-in chicken. */
+  /** Edible fraction of the purchased weight — 0.65 for bone-in chicken.
+   *  Drives the meal maths. Not what the Ingredients table shows. */
   edible_yield: number;
+  /** Protein in one kg AS PURCHASED — bone, shell and peel included, which is
+   *  what makes cost ÷ protein an honest comparison between two things on a
+   *  price board. Null until looked up; never zero. */
+  protein_g_per_kg: number | null;
+  /** How much of a purchased kg is food rather than waste. Read by nothing —
+   *  it measures the buy, it does not enter any calculation. */
+  edible_g_per_kg: number | null;
   /** What one piece weighs, when this is a thing you count rather than weigh. */
   grams_per_piece: number | null;
   /** What one ml weighs. Most liquids are ~1; oil is ~0.91. */
@@ -302,6 +310,26 @@ export function itemTotals(item: MealItem, food: Food | undefined): Totals {
     cost,
   };
 }
+
+/**
+ * What a gram of protein costs, from the two per-kilo figures as they are
+ * entered. Deliberately NOT yield-adjusted: both sides are per kg as
+ * purchased, so the waste is already priced into each of them and dividing by
+ * the edible fraction as well would count it twice.
+ *
+ * Derived rather than stored, so it cannot disagree with the two numbers
+ * sitting beside it.
+ */
+export function perGramProtein(food: Food): number | null {
+  const cost = food.price_per_kg;
+  const protein = food.protein_g_per_kg;
+  if (cost === null || protein === null || !protein) return null;
+  return cost / protein;
+}
+
+/** ₹1.26 rather than ₹1 — at this scale the paise are the comparison. */
+export const rupees2 = (n: number) =>
+  `₹${n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 /** The per-kg rate, worked out backwards from what was actually paid. A
  *  comparison number only — the per-meal figure above is the real one. */
