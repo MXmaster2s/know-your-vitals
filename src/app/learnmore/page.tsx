@@ -98,12 +98,9 @@ export default function LearnMorePage() {
 
           {/* Understated on purpose: it works, but it is not the reason to buy. */}
           <p className="mt-10 max-w-xl text-xs leading-relaxed text-muted-foreground/80">
-            Your AI can read it too — point it at{" "}
-            <span className="font-mono text-muted-foreground">
-              health.openhouse.ink/mcp
-            </span>
-            , sign in once in the browser, and ask it questions about your own
-            numbers. Early, and getting better.
+            Your AI can read it too — once you are signed in, Health gives you
+            a private address for ChatGPT or Claude, and your AI can ask
+            questions about your own numbers. Early, and getting better.
           </p>
         </section>
       </div>

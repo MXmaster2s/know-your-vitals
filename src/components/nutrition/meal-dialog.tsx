@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { EditNum, EditText, EditWrapText } from "@/components/nutrition/edit-cell";
-import { IngredientDialog } from "@/components/nutrition/ingredient-dialog";
+import { AI_MARK, IngredientDialog } from "@/components/nutrition/ingredient-dialog";
 import { NutrientPills } from "@/components/nutrition/nutrient-pills";
 import { usePerson } from "@/components/person-provider";
 import { cn } from "@/lib/utils";
@@ -159,7 +159,7 @@ export function MealDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-3 px-3 pb-3 pt-3 sm:px-5 sm:pb-5">
+        <div className="min-w-0 space-y-3 px-3 pb-3 pt-3 sm:px-5 sm:pb-5">
           {boxes.map((box) => (
             <FoodBox
               onOpenFood={setOpenFood}
@@ -190,6 +190,9 @@ export function MealDialog({
               Read-only — only this day&apos;s owner can change it.
             </p>
           )}
+          <p className="px-1 text-[11px] text-muted-foreground">
+            {AI_MARK}: also editable by your AI.
+          </p>
         </div>
         {liveFood ? (
           <IngredientDialog
@@ -280,7 +283,7 @@ function FoodBox({
         <span>Amount / serving</span>
         <span>Unit</span>
         <span>Comments</span>
-        <span>Nutrition / serving</span>
+        <span>Nutrition / serving {AI_MARK}</span>
         <span className="text-right">Price / serving</span>
         <span />
       </div>
@@ -435,7 +438,7 @@ function ItemRow({
       {/* Both derived from the amount and the ingredient's per-kilo figures.
           Nothing here is typed: the serving states how much, the ingredient
           states what a kilo of it is, and these two are the product. */}
-      <Cell label="Nutrition / serving">
+      <Cell label={`Nutrition / serving\u00A0${AI_MARK}`}>
         {missing ? (
           <span className="block px-1.5 text-xs italic text-muted-foreground/70">
             No figures yet
@@ -491,7 +494,7 @@ function Cell({
         align === "right" && "sm:text-right"
       )}
     >
-      <span className="w-14 shrink-0 text-[10px] uppercase tracking-wider text-muted-foreground/70 sm:hidden">
+      <span className="w-[5.5rem] shrink-0 text-[10px] uppercase tracking-wider text-muted-foreground/70 sm:hidden">
         {label}
       </span>
       <div className="min-w-0 flex-1">{children}</div>
@@ -560,7 +563,7 @@ function AddIngredient({
           onKeyDown={(e) => {
             if (e.key === "Enter") submit();
           }}
-          placeholder="Add an ingredient — paneer, curry leaves, ghee…"
+          placeholder="Ingredient — paneer, ghee…"
           aria-label="Ingredient name"
           className="min-w-40 flex-1 rounded-md border bg-background px-2 py-1 text-xs"
         />
@@ -630,7 +633,7 @@ function AddFood({
         onKeyDown={(e) => {
           if (e.key === "Enter") submit();
         }}
-        placeholder="Name a food — Salad, Smoothie, Dal…"
+        placeholder="Food name — Salad, Dal…"
         aria-label="Food name"
         className="min-w-40 flex-1 rounded-md border bg-background px-2 py-1.5 text-sm"
       />

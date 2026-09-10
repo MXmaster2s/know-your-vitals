@@ -48,7 +48,7 @@ export default function PaidPage() {
   ];
 
   return (
-    <div className="mx-auto max-w-xl space-y-8 py-12 sm:py-20">
+    <div className="mx-auto max-w-xl space-y-8 px-5 py-12 sm:px-8 sm:py-20">
       <div className="space-y-2">
         <p className="text-xs uppercase tracking-wider text-positive">
           Payment received

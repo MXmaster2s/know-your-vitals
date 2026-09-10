@@ -255,7 +255,7 @@ function AddMeal({
           value={name}
           onChange={(e) => setName(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && submit()}
-          placeholder="Breakfast, lunch, tea…"
+          placeholder="Meal name"
           aria-label="Meal name"
           className="min-w-32 flex-1 rounded-md border bg-background px-2 py-1 text-xs"
         />

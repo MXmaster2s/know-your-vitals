@@ -58,7 +58,10 @@ export function ModuleShell({
             </DialogDescription>
           )}
         </DialogHeader>
-        {children}
+        {/* The panel is a grid, and a grid column will not shrink below its
+            widest unbreakable line — one long product URL would otherwise
+            push every field past the edge. */}
+        <div className="min-w-0">{children}</div>
       </DialogContent>
     </Dialog>
   );

@@ -69,7 +69,7 @@ export function DayTargets({
               <div className="truncate text-[10px] text-muted-foreground sm:text-[11px]">
                 {m.label}
               </div>
-              <div className="mt-0.5 flex flex-wrap items-baseline gap-x-1.5">
+              <div className="mt-0.5 flex flex-wrap items-baseline gap-x-1.5 gap-y-1">
                 <span className="text-lg tabular-nums leading-none sm:text-xl">
                   {fmt0(actual)}
                 </span>
@@ -84,7 +84,7 @@ export function DayTargets({
                 <span>target</span>
                 <EditNum
                   value={t}
-                  width="w-12 sm:w-11"
+                  width="w-14 sm:w-11"
                   align="left"
                   disabled={!editable || !target}
                   onSave={async (n) => {
@@ -168,7 +168,7 @@ function Verdict({ verdict }: { verdict: "under" | "over" | "on" }) {
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-0.5 text-[10px] leading-none sm:text-[11px]",
+        "inline-flex basis-full items-center gap-0.5 text-[10px] leading-none sm:basis-auto sm:text-[11px]",
         verdict === "on" ? "text-positive" : "text-attention"
       )}
     >

@@ -14,8 +14,10 @@ import {
   type Food,
 } from "@/lib/nutrition";
 
-/** Marks a field the AI keeps up to date. */
-export const AI_MARK = "✳";
+/** Marks a field the AI keeps up to date. U+2733 followed by the text-
+ *  presentation selector U+FE0E — without the selector iOS Safari draws
+ *  the green emoji version, on every phone, in every theme. */
+export const AI_MARK = "\u2733\uFE0E";
 
 /** The fields the AI is responsible for, in the order they appear. Exported
  *  so the same list can be handed to it over MCP. */

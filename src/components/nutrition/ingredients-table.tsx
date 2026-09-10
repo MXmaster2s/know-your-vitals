@@ -183,9 +183,11 @@ export function IngredientsTable({
                   <span className="block font-serif text-base">{food.name}</span>
                   {/* Below md the nutrients ride under the name, the way the
                       food column rides under the event in The day. */}
-                  <span className="mt-0.5 block text-sm text-muted-foreground md:hidden">
-                    {food.nutrients ?? "—"}
-                  </span>
+                  {food.nutrients ? (
+                    <span className="mt-0.5 block text-sm text-muted-foreground md:hidden">
+                      {food.nutrients}
+                    </span>
+                  ) : null}
                 </td>
 
                 <td
