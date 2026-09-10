@@ -207,3 +207,65 @@ update public.foods set
   fat_g_per_kg   = coalesce(fat_g_per_kg,   round((fat_g     * 10 * edible_yield)::numeric, 1)),
   fiber_g_per_kg = coalesce(fiber_g_per_kg, round((fiber_g   * 10 * edible_yield)::numeric, 1))
  where kcal is not null;
+
+-- --------------------------------------- one unit per ingredient ----
+-- Each ingredient is bought and measured in a kilo, a litre or a piece, and
+-- every figure on it is per one of those. A serving states how many g, ml or
+-- pieces were eaten. Previously the unit lived on the serving, so two
+-- helpings of the same food could be counted differently.
+alter table public.foods add column if not exists base_unit text not null default 'kg';
+alter table public.foods drop constraint if exists foods_base_unit_check;
+alter table public.foods add constraint foods_base_unit_check check (base_unit in ('kg','l','piece'));
+
+-- The per-kg columns become per-unit. Same numbers today, because every
+-- ingredient starts as 'kg'.
+alter table public.foods rename column price_per_kg     to price_per_unit;
+alter table public.foods rename column kcal_per_kg      to kcal_per_unit;
+alter table public.foods rename column protein_g_per_kg to protein_g_per_unit;
+alter table public.foods rename column carb_g_per_kg    to carb_g_per_unit;
+alter table public.foods rename column fat_g_per_kg     to fat_g_per_unit;
+alter table public.foods rename column fiber_g_per_kg   to fiber_g_per_unit;
+alter table public.foods rename column edible_g_per_kg  to edible_g_per_unit;
+
+-- A serving's amount, in the ingredient's own measure: grams for kg, ml for l,
+-- pieces for piece. qty_g is left untouched as the source it came from.
+alter table public.meal_items add column if not exists qty numeric;
+
+-- Adopt the unit the servings were already using.
+update public.foods f set base_unit = u.want
+  from (select mi.food_id,
+               case when bool_or(mi.amount_unit = 'piece') then 'piece'
+                    when bool_or(mi.amount_unit = 'ml')    then 'l'
+                    else 'kg' end as want
+          from public.meal_items mi group by mi.food_id) u
+ where u.food_id = f.id and f.base_unit = 'kg';
+
+-- Restate the rates in the adopted unit. 1 L = grams_per_ml kg; one piece =
+-- grams_per_piece / 1000 kg. Doing this before qty is rewritten keeps the two
+-- halves of every serving in step.
+update public.foods set
+  price_per_unit     = round((price_per_unit     * coalesce(grams_per_ml,1))::numeric, 4),
+  kcal_per_unit      = round((kcal_per_unit      * coalesce(grams_per_ml,1))::numeric, 4),
+  protein_g_per_unit = round((protein_g_per_unit * coalesce(grams_per_ml,1))::numeric, 4),
+  carb_g_per_unit    = round((carb_g_per_unit    * coalesce(grams_per_ml,1))::numeric, 4),
+  fat_g_per_unit     = round((fat_g_per_unit     * coalesce(grams_per_ml,1))::numeric, 4),
+  fiber_g_per_unit   = round((fiber_g_per_unit   * coalesce(grams_per_ml,1))::numeric, 4),
+  edible_g_per_unit  = round((edible_g_per_unit  * coalesce(grams_per_ml,1))::numeric, 4)
+ where base_unit = 'l';
+
+update public.foods set
+  price_per_unit     = round((price_per_unit     * grams_per_piece / 1000)::numeric, 4),
+  kcal_per_unit      = round((kcal_per_unit      * grams_per_piece / 1000)::numeric, 4),
+  protein_g_per_unit = round((protein_g_per_unit * grams_per_piece / 1000)::numeric, 4),
+  carb_g_per_unit    = round((carb_g_per_unit    * grams_per_piece / 1000)::numeric, 4),
+  fat_g_per_unit     = round((fat_g_per_unit     * grams_per_piece / 1000)::numeric, 4),
+  fiber_g_per_unit   = round((fiber_g_per_unit   * grams_per_piece / 1000)::numeric, 4),
+  edible_g_per_unit  = round((edible_g_per_unit  * grams_per_piece / 1000)::numeric, 4)
+ where base_unit = 'piece' and coalesce(grams_per_piece,0) > 0;
+
+-- And the amounts, in whatever the ingredient now measures in.
+update public.meal_items mi set qty = case f.base_unit
+    when 'piece' then round((mi.qty_g / nullif(f.grams_per_piece,0))::numeric, 3)
+    when 'l'     then round((mi.qty_g / nullif(coalesce(f.grams_per_ml,1),0))::numeric, 3)
+    else mi.qty_g end
+  from public.foods f where f.id = mi.food_id and mi.qty is null;

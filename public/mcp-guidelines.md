@@ -41,11 +41,13 @@ consumed one.
 with `figures_known: false` has no nutrition data — it is unknown, not nought,
 and must not be summed as zero. A missing panel is a gap worth naming.
 
-**R6 — One denominator: per kilo as purchased.** Every figure on an ingredient
-— cost, calories, protein, carbohydrate, fat, fibre — is per kilo of the weight
-that goes on the scale, bone and shell included. A serving is that rate times
-its grams and nothing else: no yield adjustment, no second basis, and serving
-nutrition and price are always derived rather than stated. `edible_g_per_kg`
+**R6 — One unit per ingredient, and every figure is per one of it.** Each
+ingredient is measured in a kilo, a litre, or a piece — `measured_per` says
+which — and its cost, calories, protein, carbohydrate, fat and fibre are all
+per one of those, AS PURCHASED, bone and shell included. A serving states how
+many grams, millilitres or pieces were eaten, and its figures are that amount
+times the rate. Nothing else: no yield adjustment, no second basis, and serving
+nutrition and price are always derived rather than stated. `edible_g_per_unit`
 sits alongside as an efficiency reading and is an input to nothing — applying
 it would charge for the waste twice, because the waste is already inside both
 sides. A few foods carry a short note stating a measurement convention
@@ -73,6 +75,16 @@ open the one there is — and when you do, label the number an estimate and say
 so in the same breath. Never let an estimate read as though it came off the
 product. If a link is missing and the figure matters, the useful thing is to
 say which food needs one.
+
+**R12 — Some fields are yours to keep current.** On every ingredient, six
+belong to you: `nutrition`, `kcal_per_unit`, `protein_g_per_unit`,
+`carb_g_per_unit`, `fat_g_per_unit`, `fiber_g_per_unit`. They are marked with a
+star in the app, where the owner sees "✳: also editable by your AI". You cannot
+write them yet, so when one is blank or looks wrong, say so plainly and give
+the value for the owner to enter — that is the whole of the job, and R11 governs
+where the value comes from. The remaining fields — `name`, `cost_per_unit_inr`,
+`edible_g_per_unit`, `measured_per` and `source` — are the owner's. Do not offer
+figures for those unless asked.
 
 ## How the data is shaped
 
@@ -108,6 +120,9 @@ Stating these saves you deriving them, and stops you assuming otherwise:
 
 ## Changelog
 
+- **2026-09-10 (later)** — R6 rewritten again: an ingredient now carries its
+  own unit (kilo, litre or piece) and every figure is per one of those. R12
+  added, naming the six fields the AI is responsible for.
 - **2026-09-10** — R6 rewritten. Ingredient figures moved to a single
   denominator, per kilo as purchased; `edible_yield` is no longer read by
   anything and serving nutrition and price are derived. R11 added: a recorded product link is the authority for

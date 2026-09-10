@@ -3,7 +3,6 @@
 import * as React from "react";
 import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { EditText, EditWrapText } from "@/components/nutrition/edit-cell";
 import { createMeal } from "@/lib/data";
 import { usePerson } from "@/components/person-provider";
 import { cn } from "@/lib/utils";
@@ -14,7 +13,6 @@ import {
   parseClock,
   rupees,
   tidyLabel,
-  updateMeal,
   type Food,
   type Meal,
   type MealItem,
@@ -25,9 +23,10 @@ import {
  * rule running the height of the table — because the order of the day is the
  * information here, not decoration. Everything else stays quiet.
  *
- * Time, event and food edit in place. Anywhere else on the row opens the meal.
- * The three derived columns do not edit here: they are totalled up from the
- * ingredients in Edit food, which is the only place they can honestly change.
+ * Nothing edits here. A row opens Edit food, which is where the meal's name,
+ * time and contents are changed and where the totals are actually made — a
+ * table you can read at a glance should not also be a form you can nudge by
+ * mistake.
  */
 export function DayTable({
   meals,
@@ -104,19 +103,11 @@ export function DayTable({
             const t = mealTotals(itemsByMeal.get(meal.id) ?? [], foodById);
             const last = i === meals.length - 1;
             const open = () => onOpenMeal(meal);
-            const stop = (e: React.MouseEvent) => editable && e.stopPropagation();
 
             const foodCell = (
-              <EditWrapText
-                value={meal.food_summary}
-                placeholder="What's in it"
-                className="text-sm text-muted-foreground"
-                disabled={!editable}
-                onSave={async (v) => {
-                  await updateMeal(meal.id, { food_summary: v });
-                  onChanged();
-                }}
-              />
+              <span className="block px-1.5 text-sm text-muted-foreground">
+                {meal.food_summary || "—"}
+              </span>
             );
 
             return (
@@ -142,46 +133,20 @@ export function DayTable({
                 )}
               >
                 <td
-                  onClick={stop}
                   className={cn(
                     "border-r px-1.5 py-3 text-sm tabular-nums text-muted-foreground",
                     !last && "border-b"
                   )}
                 >
-                  {editable ? (
-                    <EditText
-                      value={fmtClock(meal.at_time)}
-                      className="text-right text-sm tabular-nums"
-                      onSave={async (v) => {
-                        const parsed = v ? parseClock(v) : null;
-                        if (v && !parsed) throw new Error("bad time");
-                        await updateMeal(meal.id, { at_time: parsed });
-                        onChanged();
-                      }}
-                    />
-                  ) : (
-                    <span className="block px-1.5 text-right">
-                      {fmtClock(meal.at_time)}
-                    </span>
-                  )}
+                  <span className="block px-1.5 text-right">
+                    {fmtClock(meal.at_time)}
+                  </span>
                 </td>
 
-                <td onClick={stop} className={cn("px-1.5 py-3", !last && "border-b")}>
-                  {editable ? (
-                    <EditText
-                      value={meal.name}
-                      className="font-serif text-base"
-                      onSave={async (v) => {
-                        if (!v) return;
-                        await updateMeal(meal.id, { name: tidyLabel(v) });
-                        onChanged();
-                      }}
-                    />
-                  ) : (
-                    <span className="block px-1.5 font-serif text-base">
-                      {meal.name}
-                    </span>
-                  )}
+                <td className={cn("px-1.5 py-3", !last && "border-b")}>
+                  <span className="block px-1.5 font-serif text-base">
+                    {meal.name}
+                  </span>
                   {meal.time_note ? (
                     <span className="block px-1.5 text-[11px] text-muted-foreground">
                       {meal.time_note}
@@ -192,7 +157,6 @@ export function DayTable({
                 </td>
 
                 <td
-                  onClick={stop}
                   className={cn("hidden px-1.5 py-3 sm:table-cell", !last && "border-b")}
                 >
                   {foodCell}

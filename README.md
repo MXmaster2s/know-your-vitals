@@ -41,12 +41,13 @@ Run `supabase/nutrition.sql` to add a **Nutrition** tab: an ingredient library
 priced the way you actually shop, meal plans built from it, and macro / activity
 targets to measure the plan against.
 
-The design decision that makes it useful: **every figure on an ingredient is
-per kilo as purchased** — cost, calories, protein, carbohydrate, fat, fibre —
-so a serving is grams times that rate and nothing else. One denominator, no
-bridging factor, no question about whether the 160 g of chicken on the row is
-the bone-in weight or the meat. It is the bone-in weight, and the rate already
-knows.
+The design decision that makes it useful: **an ingredient is measured in one
+unit — a kilo, a litre or a piece — and every figure on it is per one of
+those**, as purchased. A serving says how many grams, millilitres or pieces
+were eaten, and its figures are that amount times the rate. Chicken is priced
+and counted per kilo, oil per litre, eggs per egg. No bridging factor, and no
+question about whether the 160 g of chicken on the row is the bone-in weight or
+the meat: it is the bone-in weight, and the rate already knows.
 
 That replaced a two-basis design (nutrition per 100 g *edible*, price per kg
 *as purchased*, `edible_yield` bridging them) which was arithmetically fine and
@@ -78,8 +79,14 @@ Ingredients are added by typing a name, not picking from a list — write down
 what you ate now, look the numbers up later. A food with no figures says so
 rather than counting as zero.
 
-Every number is editable inline — reference tables are approximations and your
-butcher's price is not.
+**Nothing edits in The day.** A row opens *Edit food*, which owns the meal's
+name, time and contents; a serving row there opens *Edit ingredient*, which owns
+everything about the thing itself. Each module has a back arrow that lands on
+the one beneath rather than dismissing the stack, and each is capped short of
+the viewport so there is always somewhere to tap out of it.
+
+Fields marked **✳** are the AI's to keep current — nutrients and the five macro
+figures. The same list reaches a connected AI over MCP as rule R12.
 
 **Ingredients** at the foot of the page is the same pantry priced the way you
 shop: per kilo, as purchased. Name, what it is worth eating for, cost per kilo,

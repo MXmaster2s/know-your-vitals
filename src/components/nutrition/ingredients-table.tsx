@@ -2,33 +2,23 @@
 
 import * as React from "react";
 import { ArrowDown, ArrowUp } from "lucide-react";
-import { IngredientDialog } from "@/components/nutrition/ingredient-dialog";
+import { AI_MARK, IngredientDialog } from "@/components/nutrition/ingredient-dialog";
 import { usePerson } from "@/components/person-provider";
 import { cn } from "@/lib/utils";
 import {
   fmt0,
   perGramProtein,
+  unitOf,
   rupees2,
   type Food,
   type MealItem,
 } from "@/lib/nutrition";
 
-/**
- * The pantry priced the way you shop: everything per kilo, as purchased.
- *
- * Built to be read at a counter with a price board in front of you, so the two
- * columns that survive a phone screen are what it costs and what a gram of
- * protein costs. Tap any row to open the ingredient itself — that dialog is
- * the only place these figures are edited, here or anywhere else.
- *
- * Edible/kg is the one column nothing reads. It says how much of the kilo is
- * food and how much is bone, shell or peel, and it is deliberately kept out of
- * the arithmetic: it is a figure that has to be measured by hand, most rows
- * will never have it, and a calculation that silently assumed 1 for the rest
- * is exactly the confusion this table was built to end.
- */
+/** The pantry, priced per whatever unit each ingredient is bought in. A row
+ *  opens the ingredient, which is the only place these figures are edited. */
 
-type Key = "name" | "nutrients" | "cost" | "protein" | "edible" | "rate";
+
+type Key = "name" | "nutrients" | "cost" | "protein" | "edible" | "unit" | "rate";
 
 const COLUMNS: {
   key: Key;
@@ -38,10 +28,11 @@ const COLUMNS: {
   at?: string;
 }[] = [
   { key: "name", label: "Name", align: "left" },
-  { key: "nutrients", label: "Nutrients", align: "left", at: "md" },
-  { key: "cost", label: <>Cost <Unit>₹/kg</Unit></>, align: "right" },
-  { key: "protein", label: <>Protein <Unit>g/kg</Unit></>, align: "right", at: "sm" },
-  { key: "edible", label: <>Edible <Unit>g/kg</Unit></>, align: "right", at: "lg" },
+  { key: "nutrients", label: <>Nutrients {AI_MARK}</>, align: "left", at: "md" },
+  { key: "cost", label: <>Cost <Unit>₹</Unit></>, align: "right" },
+  { key: "protein", label: <>Protein {AI_MARK} <Unit>g</Unit></>, align: "right", at: "sm" },
+  { key: "edible", label: <>Edible <Unit>g</Unit></>, align: "right", at: "lg" },
+  { key: "unit", label: "Per", align: "left", at: "lg" },
   { key: "rate", label: <><Unit>₹ / g</Unit> protein</>, align: "right" },
 ];
 
@@ -49,9 +40,10 @@ function valueOf(food: Food, key: Key): string | number | null {
   switch (key) {
     case "name": return food.name.toLowerCase();
     case "nutrients": return food.nutrients?.toLowerCase() ?? null;
-    case "cost": return food.price_per_kg;
-    case "protein": return food.protein_g_per_kg;
-    case "edible": return food.edible_g_per_kg;
+    case "cost": return food.price_per_unit;
+    case "protein": return food.protein_g_per_unit;
+    case "edible": return food.edible_g_per_unit;
+    case "unit": return food.base_unit;
     case "rate": return perGramProtein(food);
   }
 }
@@ -205,9 +197,17 @@ export function IngredientsTable({
                   {food.nutrients ?? "—"}
                 </td>
 
-                {num(food.price_per_kg)}
-                {num(food.protein_g_per_kg, "hidden sm:table-cell")}
-                {num(food.edible_g_per_kg, "hidden lg:table-cell")}
+                {num(food.price_per_unit)}
+                {num(food.protein_g_per_unit, "hidden sm:table-cell")}
+                {num(food.edible_g_per_unit, "hidden lg:table-cell")}
+                <td
+                  className={cn(
+                    "hidden px-3 py-3 text-sm text-muted-foreground lg:table-cell",
+                    !last && "border-b"
+                  )}
+                >
+                  {unitOf(food.base_unit).rate}
+                </td>
 
                 {/* Derived, so it can never disagree with the two figures it
                     comes from. A dash means one of them is still blank —
@@ -230,16 +230,13 @@ export function IngredientsTable({
         </tbody>
       </table>
 
-      <p className="border-t px-3 py-2 text-[11px] leading-relaxed text-muted-foreground">
-        Everything is per kilo as purchased, waste included — which is why cost
-        divided by protein needs no adjustment. Tap a row to edit the
-        ingredient. Edible/kg is there to show what you are throwing away;
-        nothing calculates from it.
+      <p className="border-t px-3 py-2 text-[11px] text-muted-foreground">
+        {AI_MARK}: also editable by your AI.
         {foods.some((f) => perGramProtein(f) === null) ? (
           <>
             {" "}
             {fmt0(foods.filter((f) => perGramProtein(f) === null).length)} of{" "}
-            {fmt0(foods.length)} still need a cost or a protein figure.
+            {fmt0(foods.length)} need a figure.
           </>
         ) : null}
       </p>

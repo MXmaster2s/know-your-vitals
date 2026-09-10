@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Plus, X } from "lucide-react";
+import { ChevronLeft, Plus, X } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -12,23 +12,22 @@ import {
 import { Button } from "@/components/ui/button";
 import { EditNum, EditText, EditWrapText } from "@/components/nutrition/edit-cell";
 import { IngredientDialog } from "@/components/nutrition/ingredient-dialog";
-import { UnitPicker } from "@/components/nutrition/unit-picker";
 import { usePerson } from "@/components/person-provider";
 import { cn } from "@/lib/utils";
 import {
   deleteMealFood,
   deleteMealItem,
-  displayAmount,
   findOrCreateFood,
   fmt0,
   hasFigures,
   hasRate,
   fmt1,
   fmtClock,
-  gramsFromAmount,
+  parseClock,
   insertMealFood,
   insertMealItem,
   itemTotals,
+  unitOf,
   mealTotals,
   rupees,
   summaryRenamed,
@@ -38,7 +37,6 @@ import {
   updateMeal,
   updateMealFood,
   updateMealItem,
-  type AmountUnit,
   type Food,
   type Meal,
   type MealFood,
@@ -93,25 +91,66 @@ export function MealDialog({
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
       <DialogContent
-        className="max-h-[90dvh] gap-0 overflow-y-auto p-0 sm:max-w-5xl"
-        // Focus lands on the panel, not the first Food's name field —
-        // opening this to read it should not start an edit.
+        showCloseButton={false}
+        // Capped short of the viewport so there is always somewhere to tap to
+        // get out of it on a phone.
+        className="max-h-[80dvh] gap-0 overflow-y-auto p-0 sm:max-w-5xl"
+        // Focus lands on the panel, not the first field — opening this to read
+        // it should not start an edit.
         onOpenAutoFocus={(e) => {
           e.preventDefault();
           (e.currentTarget as HTMLElement).focus();
         }}
       >
-        <DialogHeader className="sticky top-0 z-10 border-b bg-background px-5 pb-3 pt-5 text-left">
-          <DialogTitle className="font-serif text-xl">Edit food</DialogTitle>
+        <DialogHeader className="sticky top-0 z-10 border-b bg-background px-3 pb-3 pt-3 text-left sm:px-5">
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Back"
+              className="-ml-1.5 grid size-7 shrink-0 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            >
+              <ChevronLeft className="size-4" aria-hidden />
+            </button>
+            <DialogTitle className="font-serif text-lg">Edit food</DialogTitle>
+          </div>
           <DialogDescription asChild>
-            <div>
-              <span className="block text-foreground">
-                {meal.name}
-                <span className="ml-2 text-muted-foreground">
-                  {fmtClock(meal.at_time)}
-                </span>
+            <div className="pl-7">
+              {/* The meal itself is edited here, not in The day. */}
+              <span className="flex flex-wrap items-baseline gap-x-2">
+                <EditText
+                  value={meal.name}
+                  className="w-auto min-w-24 font-serif text-base text-foreground"
+                  disabled={!editable}
+                  onSave={async (v) => {
+                    if (!v) return;
+                    await updateMeal(meal.id, { name: tidyLabel(v) });
+                    onChanged();
+                  }}
+                />
+                <EditText
+                  value={fmtClock(meal.at_time)}
+                  className="w-16 text-sm tabular-nums"
+                  disabled={!editable}
+                  onSave={async (v) => {
+                    const parsed = v ? parseClock(v) : null;
+                    if (v && !parsed) throw new Error("bad time");
+                    await updateMeal(meal.id, { at_time: parsed });
+                    onChanged();
+                  }}
+                />
               </span>
-              <span className="block tabular-nums">
+              <EditWrapText
+                value={meal.food_summary}
+                placeholder="What's in it"
+                className="text-xs"
+                disabled={!editable}
+                onSave={async (v) => {
+                  await updateMeal(meal.id, { food_summary: v });
+                  onChanged();
+                }}
+              />
+              <span className="block px-1.5 tabular-nums">
                 {fmt0(total.kcal)} kcal · {fmt0(total.protein_g)}g protein ·{" "}
                 {fmt0(total.carb_g)}g carbs · {fmt0(total.fat_g)}g fat ·{" "}
                 {rupees(total.cost)}
@@ -238,7 +277,7 @@ function FoodBox({
         )}
       >
         <span>Item</span>
-        <span>Amount</span>
+        <span>Amount / serving</span>
         <span>Unit</span>
         <span>Comments</span>
         <span>Nutrition / serving</span>
@@ -293,10 +332,8 @@ function ItemRow({
    *  itself is edited in one place, which this opens. */
   onOpenFood: (foodId: string) => void;
 }) {
-  const [unitOpen, setUnitOpen] = React.useState(false);
   const line = itemTotals(item, food);
-  const amount = displayAmount(item, food);
-  const unitLabel = unitWord(item.amount_unit, amount);
+  const u = food ? unitOf(food.base_unit) : null;
   // A food added by name has no figures yet — say so rather than counting it
   // as zero and letting the day totals quietly under-report.
   const missing = !hasFigures(food);
@@ -349,27 +386,27 @@ function ItemRow({
 
       {/* Amount and its unit belong together — on a phone they share a line. */}
       <div onClick={stop} className="grid grid-cols-2 gap-2 sm:contents">
-        <Cell label="Amount">
+        <Cell label="Amount / serving">
           <EditNum
-            value={amount}
-            width="w-12"
+            value={item.qty}
+            width="w-14"
             align="left"
             disabled={!editable}
             onSave={async (n) => {
-              await updateMealItem(item.id, {
-                qty_g: gramsFromAmount(n ?? 0, item.amount_unit, food),
-              });
+              await updateMealItem(item.id, { qty: n });
               onChanged();
             }}
           />
         </Cell>
 
         <Cell label="Unit">
+          {/* The unit belongs to the ingredient, so this goes where it is
+              chosen rather than opening a second picker here. */}
           <button
             type="button"
-            disabled={!editable}
-            onClick={() => setUnitOpen(true)}
-            title={editable ? "Change the unit" : undefined}
+            disabled={!editable || !food}
+            onClick={() => food && onOpenFood(food.id)}
+            title={editable ? "Set on the ingredient" : undefined}
             className={cn(
               "rounded-md px-1.5 py-0.5 text-sm transition-colors",
               editable
@@ -377,13 +414,8 @@ function ItemRow({
                 : "cursor-default"
             )}
           >
-            {unitLabel}
+            {u?.amount ?? "—"}
           </button>
-          {item.amount_unit !== "g" ? (
-            <span className="block px-1.5 text-[11px] text-muted-foreground">
-              {fmt0(item.qty_g)} g
-            </span>
-          ) : null}
         </Cell>
       </div>
 
@@ -442,23 +474,10 @@ function ItemRow({
 
       <div onClick={stop} className="hidden sm:block sm:pt-0.5">{remove}</div>
 
-      {unitOpen ? (
-        <UnitPicker
-          item={item}
-          food={food}
-          onClose={() => setUnitOpen(false)}
-          onChanged={onChanged}
-        />
-      ) : null}
     </li>
   );
 }
 
-function unitWord(unit: AmountUnit, amount: number): string {
-  if (unit === "g") return "g";
-  if (unit === "ml") return "ml";
-  return amount === 1 ? "piece" : "pieces";
-}
 
 /** Stacked rows on a phone need their column name; the table already has one. */
 function Cell({
@@ -527,7 +546,7 @@ function AddIngredient({
         meal_id: mealId,
         meal_food_id: mealFoodId,
         food_id: foodId,
-        qty_g: n,
+        qty: n,
         sort: nextSort,
       });
       setName("");

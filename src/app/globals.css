@@ -180,3 +180,15 @@
     transition: none;
   }
 }
+/* iOS zooms the whole page in when a focused field measures under 16px, which
+   on a phone leaves the app scaled and the layout adrift. Sizing fields at
+   16px on small screens stops it at the source — the alternative, pinning
+   maximum-scale in the viewport, would take pinch-zoom away from everyone who
+   needs it. */
+@media (max-width: 639px) {
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+}

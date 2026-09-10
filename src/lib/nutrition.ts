@@ -12,24 +12,26 @@ export interface Food {
   fat_g: number | null;
   fiber_g: number | null;
   /** ₹ per kg as purchased. */
-  price_per_kg: number | null;
-  /** @deprecated Read by nothing since 2026-09-10. Kept because it is what
-   *  the per-kg figures were seeded from. `edible_g_per_kg` is the live one. */
+  price_per_unit: number | null;
+  /** @deprecated Read by nothing. Kept as the source the per-unit figures
+   *  were seeded from. `edible_g_per_unit` is the live one. */
   edible_yield: number;
-  /** Everything below is per kg AS PURCHASED — the weight that goes on the
-   *  scale, bone and shell included. One denominator for the whole table, so
-   *  "160 g of chicken" never has to mean two different things. */
-  kcal_per_kg: number | null;
-  carb_g_per_kg: number | null;
-  fat_g_per_kg: number | null;
-  fiber_g_per_kg: number | null;
+  /** How this ingredient is bought and measured. Every figure below is per
+   *  ONE of these — per kilo, per litre, or per piece — and a serving says how
+   *  many g / ml / pieces of it were eaten. */
+  base_unit: BaseUnit;
+  /** Per one base unit, AS PURCHASED: bone, shell and peel included. */
+  kcal_per_unit: number | null;
+  carb_g_per_unit: number | null;
+  fat_g_per_unit: number | null;
+  fiber_g_per_unit: number | null;
   /** Protein in one kg AS PURCHASED — bone, shell and peel included, which is
    *  what makes cost ÷ protein an honest comparison between two things on a
    *  price board. Null until looked up; never zero. */
-  protein_g_per_kg: number | null;
+  protein_g_per_unit: number | null;
   /** How much of a purchased kg is food rather than waste. Read by nothing —
    *  it measures the buy, it does not enter any calculation. */
-  edible_g_per_kg: number | null;
+  edible_g_per_unit: number | null;
   /** What one piece weighs, when this is a thing you count rather than weigh. */
   grams_per_piece: number | null;
   /** What one ml weighs. Most liquids are ~1; oil is ~0.91. */
@@ -64,19 +66,45 @@ export interface MealFood {
   sort: number | null;
 }
 
-export type AmountUnit = "g" | "ml" | "piece";
+/** What one of an ingredient is. Chosen on the ingredient, not the serving —
+ *  an egg is counted however often you eat it. */
+export type BaseUnit = "kg" | "l" | "piece";
 
-export const UNITS: { value: AmountUnit; label: string; plural: string }[] = [
-  { value: "g", label: "Grams", plural: "g" },
-  { value: "ml", label: "Millilitres", plural: "ml" },
-  { value: "piece", label: "Pieces", plural: "pieces" },
+export const BASE_UNITS: {
+  value: BaseUnit;
+  label: string;
+  /** What the figures are stated per. */
+  rate: string;
+  /** What a serving of it is counted in. */
+  amount: string;
+  hint: string;
+}[] = [
+  { value: "kg", label: "Weight", rate: "kg", amount: "g", hint: "Figures per kilo, servings in grams" },
+  { value: "l", label: "Volume", rate: "litre", amount: "ml", hint: "Figures per litre, servings in millilitres" },
+  { value: "piece", label: "Count", rate: "piece", amount: "pieces", hint: "Figures per piece, servings in pieces" },
 ];
+
+export function unitOf(base: BaseUnit) {
+  return BASE_UNITS.find((u) => u.value === base) ?? BASE_UNITS[0];
+}
+
+/** How many base units a serving is. Grams and millilitres are thousandths of
+ *  their unit; a piece is the unit. */
+export function unitsIn(qty: number, base: BaseUnit): number {
+  return base === "piece" ? qty : qty / 1000;
+}
+
+/** Legacy: still the column name on meal_items for the old gram amount. */
+export type AmountUnit = "g" | "ml" | "piece";
 
 export interface MealItem {
   id: string;
   meal_id: string;
   food_id: string;
-  /** Grams as purchased — bone-in weight, dry weight, whatever you weigh. */
+  /** How much of the ingredient this serving is, in whatever the ingredient
+   *  is measured in: grams, millilitres, or pieces. */
+  qty: number | null;
+  /** @deprecated The gram amount `qty` was migrated from. */
   qty_g: number;
   /** What this item cost in this meal, in rupees. A fact the owner states —
    *  never derived from a rate, because the rate is the vaguer number. */
@@ -235,10 +263,8 @@ export function insertMealItem(row: {
   meal_id: string;
   meal_food_id: string;
   food_id: string;
-  qty_g: number;
-  price?: number | null;
+  qty: number;
   sort?: number;
-  amount_unit?: AmountUnit;
   comments?: string | null;
 }) {
   return run(supabase.from("meal_items").insert(row));
@@ -309,40 +335,33 @@ export const ZERO: Totals = {
  */
 export function itemTotals(item: MealItem, food: Food | undefined): Totals {
   if (!food) return { ...ZERO };
-  const kg = item.qty_g / 1000;
+  const u = unitsIn(item.qty ?? 0, food.base_unit);
   return {
-    kcal: (food.kcal_per_kg ?? 0) * kg,
-    protein_g: (food.protein_g_per_kg ?? 0) * kg,
-    carb_g: (food.carb_g_per_kg ?? 0) * kg,
-    fat_g: (food.fat_g_per_kg ?? 0) * kg,
-    fiber_g: (food.fiber_g_per_kg ?? 0) * kg,
-    cost: (food.price_per_kg ?? 0) * kg,
+    kcal: (food.kcal_per_unit ?? 0) * u,
+    protein_g: (food.protein_g_per_unit ?? 0) * u,
+    carb_g: (food.carb_g_per_unit ?? 0) * u,
+    fat_g: (food.fat_g_per_unit ?? 0) * u,
+    fiber_g: (food.fiber_g_per_unit ?? 0) * u,
+    cost: (food.price_per_unit ?? 0) * u,
   };
 }
 
 /** True when the ingredient has nutrition figures at all. A food added by name
  *  has none yet, and counting it as zero would quietly under-report the day. */
 export function hasFigures(food: Food | undefined): boolean {
-  return !!food && food.kcal_per_kg !== null;
+  return !!food && food.kcal_per_unit !== null;
 }
 
 /** True when a rupee rate exists to derive a serving price from. */
 export function hasRate(food: Food | undefined): boolean {
-  return !!food && food.price_per_kg !== null;
+  return !!food && food.price_per_unit !== null;
 }
 
-/**
- * What a gram of protein costs, from the two per-kilo figures as they are
- * entered. Deliberately NOT yield-adjusted: both sides are per kg as
- * purchased, so the waste is already priced into each of them and dividing by
- * the edible fraction as well would count it twice.
- *
- * Derived rather than stored, so it cannot disagree with the two numbers
- * sitting beside it.
- */
+/** What a gram of protein costs. Derived, so it cannot disagree with the two
+ *  figures beside it. */
 export function perGramProtein(food: Food): number | null {
-  const cost = food.price_per_kg;
-  const protein = food.protein_g_per_kg;
+  const cost = food.price_per_unit;
+  const protein = food.protein_g_per_unit;
   if (cost === null || protein === null || !protein) return null;
   return cost / protein;
 }
