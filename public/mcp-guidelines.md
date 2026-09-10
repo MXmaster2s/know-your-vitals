@@ -6,8 +6,8 @@ served three ways so no client misses it: as the `instructions` returned by
 <https://health.openhouse.ink/mcp-guidelines.md>.
 
 The server gives one household **read-only** access to its own lab results and
-nutrition plan, through four tools: `overview`, `marker`, `nutrition`,
-`reports`. Call `overview` first.
+nutrition plan, through five tools: `overview`, `marker`, `nutrition`,
+`ingredients`, `reports`. Call `overview` first.
 
 ## Rules
 
@@ -61,6 +61,15 @@ else. Do not imply otherwise, and do not speculate about data you cannot read.
 **R10 — Use the names as given.** Refer to people by their `display_name`. Where
 pronouns are needed and none are stated, use they/them.
 
+**R11 — A product link outranks your own estimate.** When an ingredient
+carries a `source` URL, that page is the authority for that food's figures:
+open it and use what it states, and say where the number came from. Estimate
+from general reference tables only when there is no link, or when you cannot
+open the one there is — and when you do, label the number an estimate and say
+so in the same breath. Never let an estimate read as though it came off the
+product. If a link is missing and the figure matters, the useful thing is to
+say which food needs one.
+
 ## How the data is shaped
 
 - A **person** has **reports** (a lab visit on a date), and each report has
@@ -71,6 +80,13 @@ pronouns are needed and none are stated, use they/them.
   ("Salad", "Dal"), and each food holds **ingredients** with grams, macros and
   price. `nutrition_targets` and `activity_targets` are what the plan is
   measured against.
+- The **pantry** behind those meals is the whole household's, and `ingredients`
+  returns it — including foods not currently in any meal. It uses a different
+  denominator from everything else: **per kilo as purchased**, waste included
+  on both sides, which is what makes `cost / protein` a fair comparison between
+  two things on a price board. `edible_g_per_kg` sits beside it as an
+  efficiency reading and is an input to nothing; applying it to
+  `inr_per_g_protein` would charge for the waste twice.
 - A report with `planned: true` is a visit intended, not taken. It carries the
   panel list, and nothing hangs off it yet.
 
@@ -88,6 +104,9 @@ Stating these saves you deriving them, and stops you assuming otherwise:
 
 ## Changelog
 
+- **2026-09-10** — R11 added: a recorded product link is the authority for
+  that food's figures, and an estimate must say it is one. New `ingredients`
+  tool, carrying the pantry priced per kilo as purchased.
 - **2026-09-04** — First version. R1 added at the owner's instruction after
   agent-written notes stored in data rows were found contradicting the numbers
   beside them; every such note has since been removed from the database.

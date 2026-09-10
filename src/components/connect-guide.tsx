@@ -168,6 +168,10 @@ export function Guide({ addresses }: { addresses: React.ReactNode }) {
             The planned day: meals, ingredients, grams, calories, protein,
             carbohydrate, fat, fibre, cost, and targets.
           </Tool>
+          <Tool name="ingredients">
+            The pantry priced per kilo as bought — cost, protein, edible
+            weight, rupees per gram of protein, and any product link.
+          </Tool>
           <Tool name="reports">
             Every lab visit, the findings, and the status of uploaded PDFs.
           </Tool>
@@ -178,9 +182,9 @@ export function Guide({ addresses }: { addresses: React.ReactNode }) {
         </p>
         <p className="text-sm leading-relaxed text-muted-foreground">
           Every connected AI is handed a standing brief when it connects: ten
-          numbered rules covering how to read a lab range, what the data does
-          not contain, and the instruction to report what the numbers did
-          rather than diagnose. Read it at{" "}
+          numbered rules covering how to read a lab range, where a figure
+          must come from, what the data does not contain, and the instruction
+          to report what the numbers did rather than diagnose. Read it at{" "}
           <a
             href="/mcp-guidelines.md"
             className="underline decoration-border underline-offset-4 hover:decoration-foreground"

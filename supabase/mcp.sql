@@ -304,6 +304,49 @@ begin
       'people', res);
   end if;
 
+  if p_tool = 'ingredients' then
+    -- The pantry priced the way it is bought. Everything per kilo AS
+    -- PURCHASED, so the waste is already inside both numbers and
+    -- cost / protein needs no yield adjustment. edible_g_per_kg is reported
+    -- for interest and is not an input to anything here.
+    select jsonb_build_object(
+      'note', 'Every ingredient in this household, priced per kilo AS PURCHASED — '
+              'bone, shell and peel included in both the cost and the protein, which '
+              'is why inr_per_g_protein needs no yield adjustment and why applying '
+              'edible_g_per_kg to it would count the waste twice. edible_g_per_kg is '
+              'an efficiency reading only. per_100g_edible uses a different '
+              'denominator: edible weight, as the meal figures do. A null is a figure '
+              'nobody has looked up yet, never a zero. Sorted cheapest protein first. '
+              'Where `source` is set, that page is the authority for this food''s '
+              'numbers — read it before estimating (see rule R11).',
+      'ingredients', (
+        select coalesce(jsonb_agg(jsonb_build_object(
+                 'name', f.name,
+                 'nutrition', nullif(f.nutrients, ''),
+                 'cost_per_kg_inr', f.price_per_kg,
+                 'protein_g_per_kg', f.protein_g_per_kg,
+                 'edible_g_per_kg', f.edible_g_per_kg,
+                 'inr_per_g_protein', case
+                   when f.price_per_kg is null or coalesce(f.protein_g_per_kg, 0) = 0
+                   then null else round(f.price_per_kg / f.protein_g_per_kg, 2) end,
+                 'source', nullif(f.source_url, ''),
+                 'per_100g_edible', case when f.kcal is null then null else jsonb_build_object(
+                   'kcal', f.kcal, 'protein_g', f.protein_g, 'carb_g', f.carb_g,
+                   'fat_g', f.fat_g, 'fiber_g', f.fiber_g) end,
+                 'used_in_meals', (select count(*) from public.meal_items mi
+                                    join public.meals ml on ml.id = mi.meal_id
+                                   where mi.food_id = f.id and ml.person_id = any(ids)),
+                 'notes', nullif(f.notes, ''))
+               order by case
+                 when f.price_per_kg is null or coalesce(f.protein_g_per_kg, 0) = 0
+                 then null else f.price_per_kg / f.protein_g_per_kg end
+               nulls last, f.name), '[]'::jsonb)
+          from public.foods f
+         where f.household is null or f.household = hh)
+    ) into res;
+    return res;
+  end if;
+
   if p_tool = 'reports' then
     select jsonb_build_object(
       'reports', (

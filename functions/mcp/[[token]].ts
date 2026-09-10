@@ -108,6 +108,16 @@ const TOOLS = [
     inputSchema: { type: "object", properties: {}, additionalProperties: false },
   },
   {
+    name: "ingredients",
+    description:
+      "The pantry priced the way it is bought: every ingredient with its cost " +
+      "per kilo, protein per kilo, edible per kilo and rupees per gram of " +
+      "protein, plus the product link where one is recorded. Everything is " +
+      "per kilo AS PURCHASED. Use this to compare what to buy, or a price " +
+      "board against what is already in the kitchen.",
+    inputSchema: { type: "object", properties: {}, additionalProperties: false },
+  },
+  {
     name: "reports",
     description:
       "Every lab visit — date, lab, how many readings, whether it is still " +

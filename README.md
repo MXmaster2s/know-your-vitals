@@ -168,9 +168,15 @@ The token is the whole credential, and the design leans on three things:
   one JSON reply. `initialize` verifies the token, so a wrong address fails
   when it is added rather than at the first question.
 
-Four tools — `overview`, `marker`, `nutrition`, `reports`. The signed-in page
-at `/chatgpt` mints and revokes addresses and carries the setup steps for both
-apps.
+Five tools — `overview`, `marker`, `nutrition`, `ingredients`, `reports`. The
+signed-in page at `/chatgpt` mints and revokes addresses and carries the setup
+steps for both apps.
+
+`ingredients` is the pantry rather than the plan, and it is the one tool with a
+different denominator: **per kilo as purchased**, waste on both sides, so
+`cost / protein` compares a price board fairly without any yield adjustment.
+Its payload says so, because an AI that helpfully divides by `edible_g_per_kg`
+as well has charged for the bone twice.
 
 ### Telling the AI how to read the data
 
@@ -191,7 +197,10 @@ while disallowing everything else.
 
 The rule that prompted it is **R1**: an AI may record facts, never commentary.
 A note written into a data row is indistinguishable from the owner's own words,
-so it reads as authoritative and contradicts the field beside it.
+so it reads as authoritative and contradicts the field beside it. **R11** is the
+other one worth knowing: where a food carries a product link, that page is the
+authority for its figures — estimating is what you do when there is no link, and
+an estimate has to say that it is one.
 
 ## Who may edit what
 
