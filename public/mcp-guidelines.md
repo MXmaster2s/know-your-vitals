@@ -86,6 +86,14 @@ where the value comes from. The remaining fields — `name`, `cost_per_unit_inr`
 `edible_g_per_unit`, `measured_per` and `source` — are the owner's. Do not offer
 figures for those unless asked.
 
+**R13 — A nutrient list names substances, not effects.** The `nutrition` field
+on an ingredient lists what is in the food and stops: "Vitamin C", "Omega-3
+(EPA/DHA)", "Oxalate (high)". What a nutrient *does* for the person reading is
+a sentence in your reply, never a value in the column — "Vitamin C — helps iron
+absorb" is two things stapled together, and only the first is data. Do not list
+what a food lacks either: an absence is not a nutrient, so no "little omega-3".
+This is R1 applied to the field you own most of.
+
 ## How the data is shaped
 
 - A **person** has **reports** (a lab visit on a date), and each report has
@@ -120,6 +128,8 @@ Stating these saves you deriving them, and stops you assuming otherwise:
 
 ## Changelog
 
+- **2026-09-10 (evening)** — R13 added: a nutrient list names substances, not
+  what they do for you and not what the food lacks.
 - **2026-09-10 (later)** — R6 rewritten again: an ingredient now carries its
   own unit (kilo, litre or piece) and every figure is per one of those. R12
   added, naming the six fields the AI is responsible for.

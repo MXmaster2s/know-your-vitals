@@ -86,7 +86,16 @@ the one beneath rather than dismissing the stack, and each is capped short of
 the viewport so there is always somewhere to tap out of it.
 
 Fields marked **✳** are the AI's to keep current — nutrients and the five macro
-figures. The same list reaches a connected AI over MCP as rule R12.
+figures. The same list reaches a connected AI over MCP as rule R12. Anything
+editable carries a faint tint the read-only text does not, so a field you can
+change never has to be discovered by tapping around.
+
+A serving's nutrition renders as one pill per thing it actually contains —
+`166 kcal`, `21.3g protein`, `8.9g fat`. Nothing that measures zero gets a
+pill, because a zero reads as a measurement when it is really an absence. The
+qualitative list beside it names substances only: "Vitamin C", not "Vitamin C —
+helps iron absorb". What a nutrient does for the person reading is a sentence in
+a conversation, and R13 says so to the AI as well.
 
 **Ingredients** at the foot of the page is the same pantry priced the way you
 shop: per kilo, as purchased. Name, what it is worth eating for, cost per kilo,

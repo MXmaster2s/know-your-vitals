@@ -9,6 +9,7 @@
   --color-foreground: var(--foreground);
   --color-annotation: var(--annotation);
   --color-attention: var(--attention);
+  --color-editable: var(--editable);
   --color-positive: var(--positive);
   --color-ink: var(--ink);
   --color-ink-foreground: var(--ink-foreground);
@@ -65,6 +66,7 @@
   --ink-edge: oklch(0.22 0.012 262 / 25%);
   --annotation: oklch(0.78 0.12 27);
   --attention: oklch(0.56 0.15 45);
+  --editable: oklch(0.52 0.09 245);
   --positive: oklch(0.52 0.12 155);
   --card: oklch(0.995 0.002 106);
   --card-foreground: oklch(0.22 0.012 262);
@@ -107,6 +109,7 @@
   --ink-edge: oklch(0.96 0.004 106 / 18%);
   --annotation: oklch(0.78 0.12 27);
   --attention: oklch(0.78 0.14 50);
+  --editable: oklch(0.74 0.09 245);
   --positive: oklch(0.76 0.13 158);
   --card: oklch(0.21 0.01 262);
   --card-foreground: oklch(0.985 0 0);

@@ -12,6 +12,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { EditNum, EditText, EditWrapText } from "@/components/nutrition/edit-cell";
 import { IngredientDialog } from "@/components/nutrition/ingredient-dialog";
+import { NutrientPills } from "@/components/nutrition/nutrient-pills";
 import { usePerson } from "@/components/person-provider";
 import { cn } from "@/lib/utils";
 import {
@@ -21,7 +22,6 @@ import {
   fmt0,
   hasFigures,
   hasRate,
-  fmt1,
   fmtClock,
   parseClock,
   insertMealFood,
@@ -130,7 +130,7 @@ export function MealDialog({
                 />
                 <EditText
                   value={fmtClock(meal.at_time)}
-                  className="w-16 text-sm tabular-nums"
+                  className="w-[4.5rem] text-sm tabular-nums"
                   disabled={!editable}
                   onSave={async (v) => {
                     const parsed = v ? parseClock(v) : null;
@@ -441,20 +441,12 @@ function ItemRow({
             No figures yet
           </span>
         ) : (
-          <>
-            <span className="block px-1.5 text-sm tabular-nums">
-              {fmt0(line.kcal)} kcal · {fmt1(line.protein_g)} g protein
-            </span>
-            <span className="block px-1.5 text-[11px] tabular-nums text-muted-foreground">
-              {fmt1(line.carb_g)} c · {fmt1(line.fat_g)} f · {fmt1(line.fiber_g)} fib
-            </span>
-          </>
+          <NutrientPills
+            totals={line}
+            nutrients={food?.nutrients ?? null}
+            className="px-1.5"
+          />
         )}
-        {food?.nutrients ? (
-          <span className="block px-1.5 text-[11px] text-muted-foreground">
-            {food.nutrients}
-          </span>
-        ) : null}
       </Cell>
 
       <Cell label="Price / serving" align="right">

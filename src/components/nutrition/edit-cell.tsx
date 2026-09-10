@@ -3,6 +3,12 @@
 import * as React from "react";
 import { cn } from "@/lib/utils";
 
+/** What an editable field looks like at rest. Faint, but never the same as the
+ *  text beside it — a field you can change should not have to be discovered. */
+export const EDITABLE =
+  "border border-editable/30 bg-editable/[0.07] transition-colors " +
+  "hover:border-editable/70 focus:border-editable focus:bg-background focus:outline-none";
+
 /**
  * Inline editor that commits on blur or Enter and rolls back if the write
  * fails. Escape abandons the edit. Deliberately not a form — every cell is
@@ -78,9 +84,10 @@ export function EditNum({
         className={cn(
           width,
           align === "right" ? "text-right" : "text-left",
-          "rounded-md border border-transparent bg-transparent px-1.5 py-0.5",
-          "tabular-nums transition-colors",
-          "hover:border-border focus:border-ring focus:bg-background focus:outline-none",
+          "rounded-md px-1.5 py-0.5 tabular-nums",
+          disabled
+            ? "border border-transparent bg-transparent"
+            : EDITABLE,
           busy && "opacity-50",
           failed && "border-destructive text-destructive",
           disabled && "cursor-not-allowed opacity-40"
@@ -160,11 +167,10 @@ export function EditText({
         }
       }}
       className={cn(
-        "w-full rounded-md border border-transparent bg-transparent px-1.5 py-0.5",
-        "transition-colors hover:border-border focus:border-ring focus:bg-background focus:outline-none",
+        "w-full rounded-md px-1.5 py-0.5",
+        disabled ? "border border-transparent bg-transparent" : EDITABLE,
         busy && "opacity-50",
         failed && "border-destructive text-destructive",
-        disabled && "cursor-default hover:border-transparent",
         className
       )}
     />
@@ -221,9 +227,8 @@ export function EditWrapText({
         }
       }}
       className={cn(
-        "block rounded-md border border-transparent px-1.5 py-0.5 text-left",
-        !disabled &&
-          "cursor-text transition-colors hover:border-border focus:border-ring focus:outline-none",
+        "block rounded-md px-1.5 py-0.5 text-left",
+        disabled ? "border border-transparent" : cn("cursor-text", EDITABLE),
         className
       )}
     >
