@@ -88,7 +88,11 @@ export default function NutritionPage() {
 
       <section className="space-y-3">
         <ModuleHeading>Ingredients</ModuleHeading>
-        <IngredientsTable foods={data.foods} onChanged={refresh} />
+        <IngredientsTable
+          foods={data.foods}
+          items={data.items}
+          onChanged={refresh}
+        />
       </section>
 
       {/* Nutrition works without a dashboard and without paying, so the

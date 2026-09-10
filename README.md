@@ -88,6 +88,14 @@ does drive meal nutrition) so filling it in can never move a day's calories.
 Blank means not looked up yet. It is never treated as zero, and the footer says
 how many rows are still waiting on a figure.
 
+Name, nutrients and every figure edit in place; the link icon beside a name
+opens the same product-link dialog Edit food uses. Removing an ingredient is
+the one destructive control on the page, so it says what else goes:
+`meal_items.food_id` is `ON DELETE CASCADE`, meaning a food you delete takes
+every ingredient line built on it — and the days those sat in quietly lose the
+calories, protein and cost they contributed. The confirmation counts them
+first.
+
 ## Analytics
 
 With more than one reader, an **Analytics** section appears in the nav — but
